@@ -14,7 +14,7 @@ func QueryHistory(queryService *query.Service, exerciseRepo *exercise.Repo) http
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := auth.UserFromContext(r.Context())
 		if u == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			JSONError(w, "unauthorized", "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
@@ -27,7 +27,7 @@ func QueryHistory(queryService *query.Service, exerciseRepo *exercise.Repo) http
 			variant = "standard"
 		}
 		if category == "" {
-			http.Error(w, `{"error":"category or exercise required","code":"invalid_input"}`, http.StatusBadRequest)
+			JSONError(w, "category or exercise required", "invalid_input", http.StatusBadRequest)
 			return
 		}
 
@@ -37,10 +37,12 @@ func QueryHistory(queryService *query.Service, exerciseRepo *exercise.Repo) http
 				limit = n
 			}
 		}
+		fromDate := r.URL.Query().Get("from")
+		toDate := r.URL.Query().Get("to")
 
-		entries, variantOut, err := queryService.History(r.Context(), u.ID, category, variant, limit)
+		entries, variantOut, err := queryService.History(r.Context(), u.ID, category, variant, fromDate, toDate, limit)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			JSONError(w, "internal error", "internal_error", http.StatusInternalServerError)
 			return
 		}
 		if variantOut == nil {

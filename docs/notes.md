@@ -76,6 +76,12 @@ Migrations run automatically before each deploy via `release_command`. Requires 
 | `R2_BUCKET` | When R2 | Bucket name (gym-app) |
 | `FCM_CREDENTIALS_PATH` | When FCM | Path to Firebase service account JSON |
 | `OPENAI_API_KEY` | When AI | OpenAI API key. Create at https://platform.openai.com/api-keys. Add to .env. Verify: `make verify-openai` |
+| `OPENAI_TEST_MODE` | When AI | Set `true` for tests. Skips real API calls; uses mocks. **Prevents test suites from burning credits.** |
+| `OPENAI_RATE_PER_MINUTE` | No | Per-user rate limit (default 10). |
+| `OPENAI_DAILY_LIMIT` | No | Per-user daily cap (default 100). |
+| `OPENAI_DALLE_DAILY_LIMIT` | No | Per-user DALL-E cap (default 5). |
+
+**AI throttling:** See `docs/ai-throttling.md`. Tests must never call real OpenAI. Set `OPENAI_TEST_MODE=true` in `.env` when running `make test`.
 
 Copy `.env.example` to `.env`. Unset optional vars are ignored; app works without R2/FCM/OpenAI until those features are used.
 

@@ -71,16 +71,32 @@ func (r *Repo) GetByID(ctx context.Context, id uuid.UUID) (*LogEntry, error) {
 }
 
 func (r *Repo) ListByUserAndVariant(ctx context.Context, userID, variantID uuid.UUID, limit int) ([]*LogEntry, error) {
+	return r.ListByUserAndVariantWithDateRange(ctx, userID, variantID, "", "", limit)
+}
+
+func (r *Repo) ListByUserAndVariantWithDateRange(ctx context.Context, userID, variantID uuid.UUID, fromDate, toDate string, limit int) ([]*LogEntry, error) {
 	if limit <= 0 {
 		limit = 20
+	}
+	var fromVal, toVal interface{}
+	if fromDate != "" {
+		fromVal = fromDate
+	} else {
+		fromVal = "1900-01-01"
+	}
+	if toDate != "" {
+		toVal = toDate
+	} else {
+		toVal = "2100-01-01"
 	}
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT e.id, e.session_id, e.exercise_variant_id, COALESCE(e.raw_speech,''), COALESCE(e.notes,''), e.disabled_at, e.created_at
 		 FROM log_entries e
 		 JOIN workout_sessions s ON e.session_id = s.id
 		 WHERE s.user_id = $1 AND e.exercise_variant_id = $2 AND e.disabled_at IS NULL
-		 ORDER BY e.created_at DESC LIMIT $3`,
-		userID, variantID, limit,
+		 AND s.date >= $3::date AND s.date <= $4::date
+		 ORDER BY e.created_at DESC LIMIT $5`,
+		userID, variantID, fromVal, toVal, limit,
 	)
 	if err != nil {
 		return nil, err
@@ -151,5 +167,30 @@ func (r *Repo) setsForEntry(ctx context.Context, entryID uuid.UUID) ([]LogEntryS
 		sets = append(sets, s)
 	}
 	return sets, rows.Err()
+}
+
+func (r *Repo) UpdateSet(ctx context.Context, setID uuid.UUID, weight *float64, reps *int) error {
+	if weight != nil && reps != nil {
+		_, err := r.db.ExecContext(ctx,
+			`UPDATE log_entry_sets SET weight = $1, reps = $2 WHERE id = $3`,
+			db.NullFloat64(weight), *reps, setID,
+		)
+		return err
+	}
+	if weight != nil {
+		_, err := r.db.ExecContext(ctx,
+			`UPDATE log_entry_sets SET weight = $1 WHERE id = $2`,
+			db.NullFloat64(weight), setID,
+		)
+		return err
+	}
+	if reps != nil {
+		_, err := r.db.ExecContext(ctx,
+			`UPDATE log_entry_sets SET reps = $1 WHERE id = $2`,
+			*reps, setID,
+		)
+		return err
+	}
+	return nil
 }
 

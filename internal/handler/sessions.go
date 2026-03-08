@@ -17,7 +17,7 @@ func SessionsList(sessionRepo *session.Repo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := auth.UserFromContext(r.Context())
 		if u == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			JSONError(w, "unauthorized", "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
@@ -30,7 +30,7 @@ func SessionsList(sessionRepo *session.Repo) http.HandlerFunc {
 
 		sessions, err := sessionRepo.ListByUser(r.Context(), u.ID, limit)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			JSONError(w, "internal error", "internal_error", http.StatusInternalServerError)
 			return
 		}
 
@@ -52,34 +52,34 @@ func SessionDetail(sessionRepo *session.Repo, logentryRepo *logentry.Repo, exerc
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := auth.UserFromContext(r.Context())
 		if u == nil {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			JSONError(w, "unauthorized", "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		idStr := r.PathValue("id")
 		if idStr == "" {
-			http.Error(w, `{"error":"missing session id","code":"invalid_input"}`, http.StatusBadRequest)
+			JSONError(w, "missing session id", "invalid_input", http.StatusBadRequest)
 			return
 		}
 		id, err := uuid.Parse(idStr)
 		if err != nil {
-			http.Error(w, `{"error":"invalid session id","code":"invalid_input"}`, http.StatusBadRequest)
+			JSONError(w, "invalid session id", "invalid_input", http.StatusBadRequest)
 			return
 		}
 
 		sess, err := sessionRepo.GetByID(r.Context(), id)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			JSONError(w, "internal error", "internal_error", http.StatusInternalServerError)
 			return
 		}
 		if sess == nil || sess.UserID != u.ID {
-			http.Error(w, `{"error":"not found","code":"not_found"}`, http.StatusNotFound)
+			JSONError(w, "not found", "not_found", http.StatusNotFound)
 			return
 		}
 
 		entries, err := logentryRepo.ListBySession(r.Context(), sess.ID)
 		if err != nil {
-			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+			JSONError(w, "internal error", "internal_error", http.StatusInternalServerError)
 			return
 		}
 

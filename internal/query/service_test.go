@@ -66,7 +66,7 @@ func TestService_History_returnsEntries(t *testing.T) {
 
 	svc := NewService(exerciseRepo, logentryRepo, sessionRepo)
 
-	entries, variant, err := svc.History(ctx, u.ID, "deadlift", "standard", 20)
+	entries, variant, err := svc.History(ctx, u.ID, "deadlift", "standard", "", "", 20)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestService_History_notFoundReturnsNil(t *testing.T) {
 	sessionRepo := session.NewRepo(db)
 	svc := NewService(exerciseRepo, logentryRepo, sessionRepo)
 
-	entries, variant, err := svc.History(ctx, u.ID, "nonexistent exercise", "standard", 20)
+	entries, variant, err := svc.History(ctx, u.ID, "nonexistent exercise", "standard", "", "", 20)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -71,3 +71,8 @@ func (r *Repo) ListByUser(ctx context.Context, userID uuid.UUID) ([]*PersonalRec
 	}
 	return out, rows.Err()
 }
+
+func (r *Repo) UpdateImageURL(ctx context.Context, id uuid.UUID, imageURL string) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE personal_records SET image_url = $1 WHERE id = $2`, imageURL, id)
+	return err
+}

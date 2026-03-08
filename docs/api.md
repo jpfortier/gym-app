@@ -12,6 +12,11 @@
 
 All log creation goes through POST /chat. No manual write endpoint.
 
+## GET /query
+
+- **Query params:** `category` or `exercise` (required), `variant` (default "standard"), `limit` (default 20), `from` (YYYY-MM-DD), `to` (YYYY-MM-DD)
+- **Response:** `{ "entries": [...], "exercise_name": "...", "variant_name": "..." }`
+
 ## GET /sessions
 
 - **Response:** JSON array of sessions.
@@ -29,6 +34,12 @@ All log creation goes through POST /chat. No manual write endpoint.
 - **Request:** `{ "text": "..." }` or `{ "audio_base64": "..." }`
 - **Response:** Varies by intent (log, query, correction). Server infers via LLM.
 - **Auth:** `Authorization: Bearer <google_id_token>`
+- **Throttling:** Per-user rate limits. See `docs/ai-throttling.md`. Set `OPENAI_TEST_MODE=true` for tests.
+
+## GET /prs/{id}/image
+
+- **Purpose:** Redirect to presigned URL for PR image. Returns 302.
+- **Auth:** Required. PR must belong to user.
 
 ## Error Responses
 

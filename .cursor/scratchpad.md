@@ -9,12 +9,12 @@
 - [x] Exercise repo + basic resolution
 - [x] GET /sessions, GET /sessions/:id
 - [x] Query service, GET /exercises, GET /prs
-- [ ] AI layer (POST /chat, Whisper, parse, etc.)
-- [ ] PR detection, DALL-E + R2
+- [x] AI layer (POST /chat, Whisper, parse, etc.)
+- [x] PR detection, DALL-E + R2
 
 ## Next
 
-AI layer (POST /chat, Whisper, parse, etc.).
+V2: FCM, notifications, admin panel.
 
 ## Segments (V1)
 

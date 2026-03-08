@@ -22,7 +22,8 @@ func NewService(exerciseRepo *exercise.Repo, logentryRepo *logentry.Repo, sessio
 }
 
 // History fetches log history for an exercise, resolved by category and variant name.
-func (s *Service) History(ctx context.Context, userID uuid.UUID, categoryName, variantName string, limit int) ([]HistoryEntry, *exercise.Variant, error) {
+// fromDate, toDate are optional (YYYY-MM-DD). Empty means no filter.
+func (s *Service) History(ctx context.Context, userID uuid.UUID, categoryName, variantName string, fromDate, toDate string, limit int) ([]HistoryEntry, *exercise.Variant, error) {
 	variant, err := s.exerciseRepo.Resolve(ctx, userID, categoryName, variantName)
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolve exercise: %w", err)
@@ -30,7 +31,7 @@ func (s *Service) History(ctx context.Context, userID uuid.UUID, categoryName, v
 	if variant == nil {
 		return nil, nil, nil
 	}
-	entries, err := s.logentryRepo.ListByUserAndVariant(ctx, userID, variant.ID, limit)
+	entries, err := s.logentryRepo.ListByUserAndVariantWithDateRange(ctx, userID, variant.ID, fromDate, toDate, limit)
 	if err != nil {
 		return nil, nil, fmt.Errorf("list entries: %w", err)
 	}
