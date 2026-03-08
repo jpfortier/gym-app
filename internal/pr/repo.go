@@ -5,6 +5,8 @@ import (
 	"database/sql"
 
 	"github.com/google/uuid"
+
+	"github.com/jpfortier/gym-app/internal/db"
 )
 
 type Repo struct {
@@ -16,21 +18,12 @@ func NewRepo(db *sql.DB) *Repo {
 }
 
 func (r *Repo) Create(ctx context.Context, pr *PersonalRecord) error {
-	if pr.ID == uuid.Nil {
-		pr.ID = uuid.Must(uuid.NewV7())
-	}
-	var reps, logEntrySetID interface{}
-	if pr.Reps != nil {
-		reps = *pr.Reps
-	}
-	if pr.LogEntrySetID != nil {
-		logEntrySetID = *pr.LogEntrySetID
-	}
+	db.EnsureV7(&pr.ID)
 	return r.db.QueryRowContext(ctx,
 		`INSERT INTO personal_records (id, user_id, exercise_variant_id, pr_type, weight, reps, log_entry_set_id, image_url)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		 RETURNING created_at`,
-		pr.ID, pr.UserID, pr.ExerciseVariantID, pr.PRType, pr.Weight, reps, logEntrySetID, nullStr(pr.ImageURL),
+		pr.ID, pr.UserID, pr.ExerciseVariantID, pr.PRType, pr.Weight, db.NullInt(pr.Reps), db.NullUUID(pr.LogEntrySetID), db.NullStr(pr.ImageURL),
 	).Scan(&pr.CreatedAt)
 }
 
@@ -49,14 +42,8 @@ func (r *Repo) GetByID(ctx context.Context, id uuid.UUID) (*PersonalRecord, erro
 	if err != nil {
 		return nil, err
 	}
-	if reps.Valid {
-		n := int(reps.Int64)
-		pr.Reps = &n
-	}
-	if logEntrySetID.Valid {
-		u, _ := uuid.Parse(logEntrySetID.String)
-		pr.LogEntrySetID = &u
-	}
+	pr.Reps = db.NullInt64ToIntPtr(reps)
+	pr.LogEntrySetID = db.NullStringToUUIDPtr(logEntrySetID)
 	return &pr, nil
 }
 
@@ -78,22 +65,9 @@ func (r *Repo) ListByUser(ctx context.Context, userID uuid.UUID) ([]*PersonalRec
 		if err := rows.Scan(&pr.ID, &pr.UserID, &pr.ExerciseVariantID, &pr.PRType, &pr.Weight, &reps, &logEntrySetID, &pr.ImageURL, &pr.CreatedAt); err != nil {
 			return nil, err
 		}
-		if reps.Valid {
-			n := int(reps.Int64)
-			pr.Reps = &n
-		}
-		if logEntrySetID.Valid {
-			u, _ := uuid.Parse(logEntrySetID.String)
-			pr.LogEntrySetID = &u
-		}
+		pr.Reps = db.NullInt64ToIntPtr(reps)
+		pr.LogEntrySetID = db.NullStringToUUIDPtr(logEntrySetID)
 		out = append(out, &pr)
 	}
 	return out, rows.Err()
-}
-
-func nullStr(s string) interface{} {
-	if s == "" {
-		return nil
-	}
-	return s
 }

@@ -5,6 +5,8 @@ import (
 	"database/sql"
 
 	"github.com/google/uuid"
+
+	"github.com/jpfortier/gym-app/internal/db"
 )
 
 type Repo struct {
@@ -16,9 +18,7 @@ func NewRepo(db *sql.DB) *Repo {
 }
 
 func (r *Repo) Create(ctx context.Context, s *Session) error {
-	if s.ID == uuid.Nil {
-		s.ID = uuid.Must(uuid.NewV7())
-	}
+	db.EnsureV7(&s.ID)
 	return r.db.QueryRowContext(ctx,
 		`INSERT INTO workout_sessions (id, user_id, date)
 		 VALUES ($1, $2, $3::date)

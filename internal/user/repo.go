@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/google/uuid"
+	"github.com/jpfortier/gym-app/internal/db"
 )
 
 type Repo struct {
@@ -36,9 +36,7 @@ func (r *Repo) GetByGoogleID(ctx context.Context, googleID string) (*User, error
 }
 
 func (r *Repo) Create(ctx context.Context, u *User) error {
-	if u.ID == uuid.Nil {
-		u.ID = uuid.Must(uuid.NewV7())
-	}
+	db.EnsureV7(&u.ID)
 	return r.db.QueryRowContext(ctx,
 		`INSERT INTO users (id, google_id, email, name, photo_url)
 		 VALUES ($1, $2, $3, $4, $5)

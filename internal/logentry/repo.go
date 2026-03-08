@@ -5,6 +5,8 @@ import (
 	"database/sql"
 
 	"github.com/google/uuid"
+
+	"github.com/jpfortier/gym-app/internal/db"
 )
 
 type Repo struct {
@@ -16,9 +18,7 @@ func NewRepo(db *sql.DB) *Repo {
 }
 
 func (r *Repo) Create(ctx context.Context, entry *LogEntry, sets []SetInput) error {
-	if entry.ID == uuid.Nil {
-		entry.ID = uuid.Must(uuid.NewV7())
-	}
+	db.EnsureV7(&entry.ID)
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -29,7 +29,7 @@ func (r *Repo) Create(ctx context.Context, entry *LogEntry, sets []SetInput) err
 		`INSERT INTO log_entries (id, session_id, exercise_variant_id, raw_speech, notes)
 		 VALUES ($1, $2, $3, $4, $5)
 		 RETURNING created_at`,
-		entry.ID, entry.SessionID, entry.ExerciseVariantID, nullStr(entry.RawSpeech), nullStr(entry.Notes),
+		entry.ID, entry.SessionID, entry.ExerciseVariantID, db.NullStr(entry.RawSpeech), db.NullStr(entry.Notes),
 	).Scan(&entry.CreatedAt)
 	if err != nil {
 		return err
@@ -40,7 +40,7 @@ func (r *Repo) Create(ctx context.Context, entry *LogEntry, sets []SetInput) err
 		_, err = tx.ExecContext(ctx,
 			`INSERT INTO log_entry_sets (id, log_entry_id, weight, reps, set_order, set_type)
 			 VALUES ($1, $2, $3, $4, $5, $6)`,
-			setID, entry.ID, nullFloat64(sets[i].Weight), sets[i].Reps, sets[i].SetOrder, nullStr(sets[i].SetType),
+			setID, entry.ID, db.NullFloat64(sets[i].Weight), sets[i].Reps, sets[i].SetOrder, db.NullStr(sets[i].SetType),
 		)
 		if err != nil {
 			return err
@@ -153,16 +153,3 @@ func (r *Repo) setsForEntry(ctx context.Context, entryID uuid.UUID) ([]LogEntryS
 	return sets, rows.Err()
 }
 
-func nullStr(s string) interface{} {
-	if s == "" {
-		return nil
-	}
-	return s
-}
-
-func nullFloat64(f *float64) interface{} {
-	if f == nil {
-		return nil
-	}
-	return *f
-}

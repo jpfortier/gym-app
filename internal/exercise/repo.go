@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+
+	"github.com/jpfortier/gym-app/internal/db"
 )
 
 type Repo struct {
@@ -17,18 +19,12 @@ func NewRepo(db *sql.DB) *Repo {
 }
 
 func (r *Repo) CreateCategory(ctx context.Context, c *Category) error {
-	if c.ID == uuid.Nil {
-		c.ID = uuid.Must(uuid.NewV7())
-	}
-	var userID interface{}
-	if c.UserID != nil {
-		userID = *c.UserID
-	}
+	db.EnsureV7(&c.ID)
 	return r.db.QueryRowContext(ctx,
 		`INSERT INTO exercise_categories (id, user_id, name, show_weight, show_reps)
 		 VALUES ($1, $2, $3, $4, $5)
 		 RETURNING created_at`,
-		c.ID, userID, c.Name, c.ShowWeight, c.ShowReps,
+		c.ID, db.NullUUID(c.UserID), c.Name, c.ShowWeight, c.ShowReps,
 	).Scan(&c.CreatedAt)
 }
 
@@ -45,10 +41,7 @@ func (r *Repo) GetCategoryByID(ctx context.Context, id uuid.UUID) (*Category, er
 	if err != nil {
 		return nil, err
 	}
-	if userID.Valid {
-		u, _ := uuid.Parse(userID.String)
-		c.UserID = &u
-	}
+	c.UserID = db.NullStringToUUIDPtr(userID)
 	return &c, nil
 }
 
@@ -71,26 +64,17 @@ func (r *Repo) GetCategoryByUserAndName(ctx context.Context, userID *uuid.UUID, 
 	if err != nil {
 		return nil, err
 	}
-	if uid.Valid {
-		u, _ := uuid.Parse(uid.String)
-		c.UserID = &u
-	}
+	c.UserID = db.NullStringToUUIDPtr(uid)
 	return &c, nil
 }
 
 func (r *Repo) CreateVariant(ctx context.Context, v *Variant) error {
-	if v.ID == uuid.Nil {
-		v.ID = uuid.Must(uuid.NewV7())
-	}
-	var userID interface{}
-	if v.UserID != nil {
-		userID = *v.UserID
-	}
+	db.EnsureV7(&v.ID)
 	return r.db.QueryRowContext(ctx,
 		`INSERT INTO exercise_variants (id, category_id, user_id, name)
 		 VALUES ($1, $2, $3, $4)
 		 RETURNING created_at`,
-		v.ID, v.CategoryID, userID, v.Name,
+		v.ID, v.CategoryID, db.NullUUID(v.UserID), v.Name,
 	).Scan(&v.CreatedAt)
 }
 
@@ -107,10 +91,7 @@ func (r *Repo) GetVariantByID(ctx context.Context, id uuid.UUID) (*Variant, erro
 	if err != nil {
 		return nil, err
 	}
-	if userID.Valid {
-		u, _ := uuid.Parse(userID.String)
-		v.UserID = &u
-	}
+	v.UserID = db.NullStringToUUIDPtr(userID)
 	return &v, nil
 }
 
@@ -133,10 +114,7 @@ func (r *Repo) GetVariantByCategoryAndName(ctx context.Context, categoryID uuid.
 	if err != nil {
 		return nil, err
 	}
-	if uid.Valid {
-		u, _ := uuid.Parse(uid.String)
-		v.UserID = &u
-	}
+	v.UserID = db.NullStringToUUIDPtr(uid)
 	return &v, nil
 }
 
@@ -157,10 +135,7 @@ func (r *Repo) ListVariantsByCategory(ctx context.Context, categoryID uuid.UUID,
 		if err := rows.Scan(&v.ID, &v.CategoryID, &uid, &v.Name, &v.CreatedAt); err != nil {
 			return nil, err
 		}
-		if uid.Valid {
-			u, _ := uuid.Parse(uid.String)
-			v.UserID = &u
-		}
+		v.UserID = db.NullStringToUUIDPtr(uid)
 		out = append(out, &v)
 	}
 	return out, rows.Err()
@@ -187,10 +162,7 @@ func scanCategories(rows *sql.Rows) ([]*Category, error) {
 		if err := rows.Scan(&c.ID, &uid, &c.Name, &c.ShowWeight, &c.ShowReps, &c.CreatedAt); err != nil {
 			return nil, err
 		}
-		if uid.Valid {
-			u, _ := uuid.Parse(uid.String)
-			c.UserID = &u
-		}
+		c.UserID = db.NullStringToUUIDPtr(uid)
 		out = append(out, &c)
 	}
 	return out, rows.Err()
