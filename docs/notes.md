@@ -15,7 +15,7 @@
 - **Distribution:** APK via S3 or R2 for now. In-app update flow. Play Store when ID verification completes.
 - **Exercise resolution:** Exact match → user alias lookup → embedding similarity → create new. Aliases learned when we resolve via embedding or create (e.g. "RDL" → Deadlift/RDL); future lookups skip the LLM.
 - **Corrections:** Via chat, not a separate PATCH endpoint. "Change my bench yesterday from 140 to 150" → LLM infers correction.
-- **Remove/undo:** Via chat. "Forget that", "remove the last bench", "scratch that" → soft-delete (disabled_at) the matching entry.
+- **Remove/undo:** Via chat. "Forget that", "remove the last bench", "scratch that" → soft-delete (disabled_at) the matching entry. "Bring that back", "oh sorry bring it back" → restore (undo the remove).
 - **Intent:** Client never chooses. Single POST /chat; LLM infers log vs query vs correction.
 - **Log structure:** Block + sets (log_entries + log_entry_sets). Supports ramp/pyramid.
 - **raw_speech:** Store the exact text the user said for each exercise block (per-exercise segment, not full paragraph). Enables reprocessing if parsing improves.

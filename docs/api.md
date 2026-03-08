@@ -38,7 +38,9 @@ All log creation goes through POST /chat. No manual write endpoint.
 
 **Exercise resolution (log intent):** Resolves exercise names (e.g. "RDL") to category/variant. Order: exact match → user alias lookup → embedding similarity → create new. When we resolve via embedding or create, we store the alias so future lookups skip the LLM.
 
-**Remove intent:** User says "forget that", "remove it", "delete the last bench", "undo that", "scratch that". Soft-deletes (disables) the matching log entry. If no exercise specified, removes the most recent entry for today.
+**Remove intent:** User says "forget that", "remove it", "delete the last bench", "scratch that". Soft-deletes (disables) the matching log entry. If no exercise specified, removes the most recent entry for today.
+
+**Restore intent:** User says "bring that back", "oh sorry bring it back", "restore that" after having removed something. Restores the most recently disabled entry for today.
 
 ## GET /prs/{id}/image
 

@@ -136,4 +136,24 @@ func TestChat_removeIntent(t *testing.T) {
 	if out["message"] != "Removed." {
 		t.Errorf("got message %v, want Removed.", out["message"])
 	}
+
+	body, _ = json.Marshal(map[string]string{"text": "oh sorry bring that back"})
+	req = httptest.NewRequest(http.MethodPost, "/chat", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer x")
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("restore: got status %d: %s", rec.Code, rec.Body.String())
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out["intent"] != "restore" {
+		t.Errorf("got intent %v, want restore", out["intent"])
+	}
+	if out["message"] != "Brought back." {
+		t.Errorf("got message %v, want Brought back.", out["message"])
+	}
 }

@@ -121,6 +121,8 @@ func (s *Service) Process(ctx context.Context, userID uuid.UUID, text string, au
 		return s.handleCorrection(ctx, userID, intent)
 	case "remove":
 		return s.handleRemove(ctx, userID, intent)
+	case "restore":
+		return s.handleRestore(ctx, userID, intent)
 	default:
 		return &Response{Intent: "unknown", Message: "I didn't understand. Try logging a workout, asking about your history, correcting a previous entry, or removing something."}, nil
 	}
@@ -251,6 +253,25 @@ func (s *Service) handleRemove(ctx context.Context, userID uuid.UUID, intent *ai
 		return &Response{Intent: "remove", Message: "Couldn't remove that entry."}, nil
 	}
 	return &Response{Intent: "remove", Message: "Removed."}, nil
+}
+
+func (s *Service) handleRestore(ctx context.Context, userID uuid.UUID, intent *ai.ParsedIntent) (*Response, error) {
+	date := intent.Date
+	if date == "" {
+		date = time.Now().Format("2006-01-02")
+	}
+	entry, err := s.logentryRepo.GetMostRecentDisabledEntryForUser(ctx, userID, date)
+	if err != nil || entry == nil {
+		return &Response{Intent: "restore", Message: "Nothing to bring back."}, nil
+	}
+	ok, err := s.logentryRepo.RestoreEntry(ctx, entry.ID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return &Response{Intent: "restore", Message: "Couldn't restore that entry."}, nil
+	}
+	return &Response{Intent: "restore", Message: "Brought back."}, nil
 }
 
 func (s *Service) handleCorrection(ctx context.Context, userID uuid.UUID, intent *ai.ParsedIntent) (*Response, error) {

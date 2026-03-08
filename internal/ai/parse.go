@@ -12,7 +12,7 @@ import (
 
 // ParsedIntent is the structured output from the LLM.
 type ParsedIntent struct {
-	Intent string `json:"intent"` // "log" | "query" | "correction" | "remove" | "unknown"
+	Intent string `json:"intent"` // "log" | "query" | "correction" | "remove" | "restore" | "unknown"
 	// Log
 	Date      string          `json:"date,omitempty"`      // YYYY-MM-DD
 	Exercises []ParsedExercise `json:"exercises,omitempty"`
@@ -51,8 +51,10 @@ Output format (one of):
 - Query: {"intent":"query","category":"bench press","variant":"standard"}
 - Correction: {"intent":"correction","target_ref":"last bench","changes":{"weight":150}}
 - Remove: {"intent":"remove","category":"bench press","variant":"standard","target_ref":"last"}
-  User wants to delete/remove/undo a logged entry. Phrases: "forget that", "remove it", "delete the last bench", "undo that", "scratch that".
+  User wants to delete/remove a logged entry. Phrases: "forget that", "remove it", "delete the last bench", "scratch that".
   If user says "forget that" or "remove it" without naming exercise, omit category/variant (we remove most recent entry). Otherwise use category and variant. target_ref: "last" or "that".
+- Restore: {"intent":"restore"}
+  User wants to bring back a recently removed entry. Phrases: "bring that back", "oh sorry bring it back", "restore that", "undo that" (after having removed something).
 - Unclear: {"intent":"unknown"}
 
 Rules:
@@ -90,6 +92,10 @@ func (p *parserImpl) parseMock(text string) (*ParsedIntent, error) {
 	}
 	if strings.Contains(text, "change") || strings.Contains(text, "correct") || strings.Contains(text, "wrong") {
 		return &ParsedIntent{Intent: "correction", TargetRef: "last", Changes: &ParsedCorrection{Weight: ptrFloat(150)}}, nil
+	}
+	if (strings.Contains(text, "bring") && strings.Contains(text, "back")) || strings.Contains(text, "restore") ||
+		(strings.Contains(text, "sorry") && strings.Contains(text, "back")) {
+		return &ParsedIntent{Intent: "restore"}, nil
 	}
 	if strings.Contains(text, "forget") || strings.Contains(text, "remove") || strings.Contains(text, "delete") ||
 		strings.Contains(text, "undo") || strings.Contains(text, "scratch") {
