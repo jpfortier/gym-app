@@ -11,15 +11,7 @@ import (
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/jpfortier/gym-app/internal/ai"
 	"github.com/jpfortier/gym-app/internal/env"
-	"github.com/jpfortier/gym-app/internal/chat"
-	"github.com/jpfortier/gym-app/internal/correction"
-	"github.com/jpfortier/gym-app/internal/exercise"
-	"github.com/jpfortier/gym-app/internal/logentry"
-	"github.com/jpfortier/gym-app/internal/pr"
-	"github.com/jpfortier/gym-app/internal/query"
-	"github.com/jpfortier/gym-app/internal/session"
 	"github.com/jpfortier/gym-app/internal/user"
 )
 
@@ -47,21 +39,7 @@ func TestChat_audioSamples(t *testing.T) {
 	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM workout_sessions WHERE user_id = $1", u.ID) })
 	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
-	throttle := ai.NewThrottlerFromEnv()
-	aiClient := ai.NewClient(throttle, nil)
-	parser := ai.NewParser(aiClient)
-	sessionRepo := session.NewRepo(db)
-	logentryRepo := logentry.NewRepo(db)
-	exerciseRepo := exercise.NewRepo(db)
-	exerciseSvc := exercise.NewService(exerciseRepo, aiClient)
-	prRepo := pr.NewRepo(db)
-	sessionSvc := session.NewService(sessionRepo)
-	logentrySvc := logentry.NewService(logentryRepo, sessionSvc)
-	querySvc := query.NewService(exerciseRepo, logentryRepo, sessionRepo)
-	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
-	prSvc := pr.NewService(prRepo)
-
-	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, nil, nil)
+	chatSvc := chatTestService(t, db, nil)
 
 	// Resolve samples path: go test runs from package dir (internal/handler), so go up to module root
 	samplesDir := filepath.Join("..", "..", "samples", "audio")

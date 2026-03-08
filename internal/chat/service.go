@@ -52,54 +52,57 @@ type PRResult struct {
 	PRType   string  `json:"pr_type"`
 }
 
+// Config holds dependencies for the chat service.
+type Config struct {
+	Client           *ai.Client
+	Parser           ai.Parser
+	SessionSvc       *session.Service
+	LogentrySvc      *logentry.Service
+	LogentryRepo     *logentry.Repo
+	ExerciseSvc      *exercise.Service
+	ExerciseRepo     *exercise.Repo
+	QuerySvc         *query.Service
+	CorrectionSvc    *correction.Service
+	PrSvc            *pr.Service
+	PrRepo           *pr.Repo
+	NotesRepo        *notes.Repo
+	ChatMessagesRepo *chatmessages.Repo
+	R2               *storage.R2
+}
+
 type Service struct {
-	client        *ai.Client
-	parser        ai.Parser
-	sessionSvc    *session.Service
-	logentrySvc   *logentry.Service
-	logentryRepo  *logentry.Repo
-	exerciseSvc   *exercise.Service
-	exerciseRepo  *exercise.Repo
-	querySvc      *query.Service
-	correctionSvc *correction.Service
-	prSvc         *pr.Service
+	client           *ai.Client
+	parser           ai.Parser
+	sessionSvc       *session.Service
+	logentrySvc      *logentry.Service
+	logentryRepo     *logentry.Repo
+	exerciseSvc      *exercise.Service
+	exerciseRepo     *exercise.Repo
+	querySvc         *query.Service
+	correctionSvc    *correction.Service
+	prSvc            *pr.Service
 	prRepo           *pr.Repo
 	notesRepo        *notes.Repo
 	chatMessagesRepo *chatmessages.Repo
 	r2               *storage.R2
 }
 
-func NewService(
-	client *ai.Client,
-	parser ai.Parser,
-	sessionSvc *session.Service,
-	logentrySvc *logentry.Service,
-	logentryRepo *logentry.Repo,
-	exerciseSvc *exercise.Service,
-	exerciseRepo *exercise.Repo,
-	querySvc *query.Service,
-	correctionSvc *correction.Service,
-	prSvc *pr.Service,
-	prRepo *pr.Repo,
-	notesRepo *notes.Repo,
-	chatMessagesRepo *chatmessages.Repo,
-	r2 *storage.R2,
-) *Service {
+func NewService(cfg Config) *Service {
 	return &Service{
-		client:           client,
-		parser:           parser,
-		sessionSvc:       sessionSvc,
-		logentrySvc:      logentrySvc,
-		logentryRepo:     logentryRepo,
-		exerciseSvc:      exerciseSvc,
-		exerciseRepo:     exerciseRepo,
-		querySvc:         querySvc,
-		correctionSvc:    correctionSvc,
-		prSvc:            prSvc,
-		prRepo:           prRepo,
-		notesRepo:        notesRepo,
-		chatMessagesRepo: chatMessagesRepo,
-		r2:               r2,
+		client:           cfg.Client,
+		parser:           cfg.Parser,
+		sessionSvc:       cfg.SessionSvc,
+		logentrySvc:      cfg.LogentrySvc,
+		logentryRepo:     cfg.LogentryRepo,
+		exerciseSvc:      cfg.ExerciseSvc,
+		exerciseRepo:     cfg.ExerciseRepo,
+		querySvc:         cfg.QuerySvc,
+		correctionSvc:    cfg.CorrectionSvc,
+		prSvc:            cfg.PrSvc,
+		prRepo:           cfg.PrRepo,
+		notesRepo:        cfg.NotesRepo,
+		chatMessagesRepo: cfg.ChatMessagesRepo,
+		r2:               cfg.R2,
 	}
 }
 

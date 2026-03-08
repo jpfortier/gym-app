@@ -57,9 +57,9 @@ Output format (one of):
   If user says "forget that" or "remove it" without naming exercise, omit category/variant (we remove most recent entry). Otherwise use category and variant. target_ref: "last" or "that".
 - Restore: {"intent":"restore"}
   User wants to bring back a recently removed entry. Phrases: "bring that back", "oh sorry bring it back", "restore that", "undo that" (after having removed something).
-- Note: {"intent":"note","category":"deadlift","variant":"rdl","content":"warm up hamstrings first"}
+- Note: {"intent":"note","category":"deadlift","variant":"rdl","note_content":"warm up hamstrings first"}
   User wants to add a reusable reminder for an exercise. Phrases: "remember for RDLs: warm up hamstrings", "add a note for deadlift: use straps when heavy", "note for bench: retract scapula".
-  category and variant identify the exercise (omit for global note). content is the reminder text.
+  category and variant identify the exercise (omit for global note). note_content is the reminder text.
 - Unclear: {"intent":"unknown"}
 
 Rules:

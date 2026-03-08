@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -24,18 +25,9 @@ import (
 	"github.com/jpfortier/gym-app/internal/user"
 )
 
-func TestChat_logIntent(t *testing.T) {
-	db := dbForTest(t)
-	defer db.Close()
-	ctx := context.Background()
-
-	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "chat-" + uuid.New().String(), Email: "c@test.com", Name: "C"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
-
+// chatTestService builds the chat service stack with mock AI. chatMessagesRepo can be nil.
+func chatTestService(t *testing.T, db *sql.DB, chatMessagesRepo *chatmessages.Repo) *chat.Service {
+	t.Helper()
 	throttle := ai.NewThrottlerFromEnv()
 	aiClient := ai.NewClient(throttle, nil)
 	parser := ai.NewParser(aiClient)
@@ -49,11 +41,37 @@ func TestChat_logIntent(t *testing.T) {
 	querySvc := query.NewService(exerciseRepo, logentryRepo, sessionRepo)
 	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
 	prSvc := pr.NewService(prRepo)
+	return chat.NewService(chat.Config{
+		Client: aiClient, Parser: parser, SessionSvc: sessionSvc, LogentrySvc: logentrySvc, LogentryRepo: logentryRepo,
+		ExerciseSvc: exerciseSvc, ExerciseRepo: exerciseRepo, QuerySvc: querySvc, CorrectionSvc: correctionSvc,
+		PrSvc: prSvc, PrRepo: prRepo, NotesRepo: nil, ChatMessagesRepo: chatMessagesRepo, R2: nil,
+	})
+}
 
-	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, nil, nil)
+// chatTestServer sets up a POST /chat handler with mock AI. chatMessagesRepo can be nil.
+func chatTestServer(t *testing.T, db *sql.DB, u *user.User, chatMessagesRepo *chatmessages.Repo) *http.ServeMux {
+	t.Helper()
+	chatSvc := chatTestService(t, db, chatMessagesRepo)
+	userRepo := user.NewRepo(db)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
 	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(Chat(chatSvc))))
+	return mux
+}
+
+func TestChat_logIntent(t *testing.T) {
+	db := dbForTest(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	userRepo := user.NewRepo(db)
+	u := &user.User{GoogleID: "chat-" + uuid.New().String(), Email: "c@test.com", Name: "C"}
+	if err := userRepo.Create(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+
+	mux := chatTestServer(t, db, u, nil)
 
 	body, _ := json.Marshal(map[string]string{"text": "bench press 135 for 8"})
 	req := httptest.NewRequest(http.MethodPost, "/chat", bytes.NewReader(body))
@@ -88,24 +106,7 @@ func TestChat_removeIntent(t *testing.T) {
 	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM workout_sessions WHERE user_id = $1", u.ID) })
 	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
-	throttle := ai.NewThrottlerFromEnv()
-	aiClient := ai.NewClient(throttle, nil)
-	parser := ai.NewParser(aiClient)
-	sessionRepo := session.NewRepo(db)
-	logentryRepo := logentry.NewRepo(db)
-	exerciseRepo := exercise.NewRepo(db)
-	exerciseSvc := exercise.NewService(exerciseRepo, aiClient)
-	prRepo := pr.NewRepo(db)
-	sessionSvc := session.NewService(sessionRepo)
-	logentrySvc := logentry.NewService(logentryRepo, sessionSvc)
-	querySvc := query.NewService(exerciseRepo, logentryRepo, sessionRepo)
-	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
-	prSvc := pr.NewService(prRepo)
-
-	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, nil, nil)
-	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
-	mux := http.NewServeMux()
-	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(Chat(chatSvc))))
+	mux := chatTestServer(t, db, u, nil)
 
 	body, _ := json.Marshal(map[string]string{"text": "bench press 135 for 8"})
 	req := httptest.NewRequest(http.MethodPost, "/chat", bytes.NewReader(body))
@@ -175,24 +176,7 @@ func TestChat_contextStoresMessages(t *testing.T) {
 	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM workout_sessions WHERE user_id = $1", u.ID) })
 	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
-	throttle := ai.NewThrottlerFromEnv()
-	aiClient := ai.NewClient(throttle, nil)
-	parser := ai.NewParser(aiClient)
-	sessionRepo := session.NewRepo(db)
-	logentryRepo := logentry.NewRepo(db)
-	exerciseRepo := exercise.NewRepo(db)
-	exerciseSvc := exercise.NewService(exerciseRepo, aiClient)
-	prRepo := pr.NewRepo(db)
-	sessionSvc := session.NewService(sessionRepo)
-	logentrySvc := logentry.NewService(logentryRepo, sessionSvc)
-	querySvc := query.NewService(exerciseRepo, logentryRepo, sessionRepo)
-	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
-	prSvc := pr.NewService(prRepo)
-
-	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, chatMessagesRepo, nil)
-	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
-	mux := http.NewServeMux()
-	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(Chat(chatSvc))))
+	mux := chatTestServer(t, db, u, chatMessagesRepo)
 
 	body, _ := json.Marshal(map[string]string{"text": "bench press 135 for 8"})
 	req := httptest.NewRequest(http.MethodPost, "/chat", bytes.NewReader(body))

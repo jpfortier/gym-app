@@ -4,13 +4,17 @@
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| `POST` | `/chat` | Main entry. Sends text (or audio). Server infers intent (log, query, correction) via LLM. Returns log confirmation, query results, or correction confirmation. *(AI layer—build after core flow works.)* |
-| `GET` | `/sessions` | List workout sessions (timeline). Optional: `?from=&to=` or `?limit=`. |
-| `GET` | `/sessions/:id` | Session detail with log entries and sets. |
-| `GET` | `/exercises` | List categories + variants. Includes show_weight, show_reps for UI (which fields to display). |
+| `GET` | `/me` | Current user (id, email, name, photo_url). Verify auth. |
+| `POST` | `/chat` | Main entry. Text or audio. Server infers intent (log, query, correction, remove, restore, note). |
+| `GET` | `/sessions` | List workout sessions (timeline). Optional: `?limit=`. |
+| `GET` | `/sessions/{id}` | Session detail with log entries and sets. |
+| `GET` | `/query` | History by exercise. Params: `category`, `variant`, `limit`, `from`, `to`. |
+| `GET` | `/exercises` | List categories + variants. Includes show_weight, show_reps for UI. |
 | `GET` | `/prs` | User's personal records. |
+| `GET` | `/prs/{id}/image` | Redirect to presigned PR image URL. 302. |
+| `GET` | `/health` | Health check. No auth. |
 
-All log creation goes through POST /chat. No manual write endpoint.
+All log creation goes through POST /chat. No manual write endpoint. See `docs/android-api.md` for full client reference.
 
 ## GET /query
 
