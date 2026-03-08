@@ -31,7 +31,7 @@ type Embedder interface {
 	Embed(ctx context.Context, userID uuid.UUID, text string) ([]float32, error)
 }
 
-// Service provides ResolveOrCreate: exact match → embedding match → create new.
+// Service provides ResolveOrCreate: exact match → alias lookup → embedding match → create new.
 type Service struct {
 	repo     *Repo
 	embedder Embedder
@@ -55,16 +55,30 @@ func (s *Service) ResolveOrCreate(ctx context.Context, userID uuid.UUID, categor
 	if v != nil {
 		return v, nil
 	}
+	aliasKey := categoryName + " " + variantName
+	v, err = s.repo.FindVariantByAlias(ctx, userID, aliasKey)
+	if err != nil {
+		return nil, err
+	}
+	if v != nil {
+		return v, nil
+	}
 	if s.embedder != nil {
 		v, err = s.resolveByEmbedding(ctx, userID, categoryName, variantName)
 		if err != nil {
 			return nil, err
 		}
 		if v != nil {
+			_ = s.repo.StoreAlias(ctx, userID, aliasKey, v.ID)
 			return v, nil
 		}
 	}
-	return s.createCategoryAndVariant(ctx, userID, categoryName, variantName)
+	v, err = s.createCategoryAndVariant(ctx, userID, categoryName, variantName)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.StoreAlias(ctx, userID, aliasKey, v.ID)
+	return v, nil
 }
 
 func (s *Service) resolveByEmbedding(ctx context.Context, userID uuid.UUID, categoryName, variantName string) (*Variant, error) {

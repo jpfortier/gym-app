@@ -116,6 +116,46 @@ func TestRepo_CreateCategory_CreateVariant_Resolve(t *testing.T) {
 	}
 }
 
+func TestRepo_StoreAlias_FindVariantByAlias(t *testing.T) {
+	db := dbForTest(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	u := createExerciseTestUser(t, db, ctx)
+	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM user_exercise_aliases WHERE user_id = $1", u.ID) })
+	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+
+	repo := NewRepo(db)
+	cat := &Category{UserID: &u.ID, Name: "Deadlift", ShowWeight: true, ShowReps: true}
+	if err := repo.CreateCategory(ctx, cat); err != nil {
+		t.Fatal(err)
+	}
+	variant := &Variant{CategoryID: cat.ID, UserID: &u.ID, Name: "rdl"}
+	if err := repo.CreateVariant(ctx, variant); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := repo.StoreAlias(ctx, u.ID, "rdl standard", variant.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	v, err := repo.FindVariantByAlias(ctx, u.ID, "rdl standard")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v == nil || v.ID != variant.ID {
+		t.Errorf("expected variant from alias, got %+v", v)
+	}
+
+	v, err = repo.FindVariantByAlias(ctx, u.ID, "nonexistent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v != nil {
+		t.Errorf("expected nil for nonexistent alias, got %+v", v)
+	}
+}
+
 func createExerciseTestUser(t *testing.T, db *sql.DB, ctx context.Context) *user.User {
 	t.Helper()
 	userRepo := user.NewRepo(db)

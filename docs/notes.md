@@ -13,7 +13,7 @@
 - **Testing:** Test early, test often. Add tests as soon as something is testable. At least one assertion of value per test.
 - **Auth:** Google Sign-In only. No Clerk, no magic link.
 - **Distribution:** APK via S3 or R2 for now. In-app update flow. Play Store when ID verification completes.
-- **Exercise resolution:** Start with exact match. Embeddings (not fuzzy match) when AI layer is added. Better at synonyms from day one.
+- **Exercise resolution:** Exact match → user alias lookup → embedding similarity → create new. Aliases learned when we resolve via embedding or create (e.g. "RDL" → Deadlift/RDL); future lookups skip the LLM.
 - **Corrections:** Via chat, not a separate PATCH endpoint. "Change my bench yesterday from 140 to 150" → LLM infers correction.
 - **Intent:** Client never chooses. Single POST /chat; LLM infers log vs query vs correction.
 - **Log structure:** Block + sets (log_entries + log_entry_sets). Supports ramp/pyramid.

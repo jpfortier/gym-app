@@ -227,6 +227,39 @@ func (r *Repo) UpdateVariantEmbedding(ctx context.Context, id uuid.UUID, emb []f
 	return err
 }
 
+func (r *Repo) FindVariantByAlias(ctx context.Context, userID uuid.UUID, aliasKey string) (*Variant, error) {
+	aliasKey = strings.TrimSpace(strings.ToLower(aliasKey))
+	if aliasKey == "" {
+		return nil, nil
+	}
+	var variantID uuid.UUID
+	err := r.db.QueryRowContext(ctx,
+		`SELECT variant_id FROM user_exercise_aliases WHERE user_id = $1 AND alias_key = $2`,
+		userID, aliasKey,
+	).Scan(&variantID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return r.GetVariantByID(ctx, variantID)
+}
+
+func (r *Repo) StoreAlias(ctx context.Context, userID uuid.UUID, aliasKey string, variantID uuid.UUID) error {
+	aliasKey = strings.TrimSpace(strings.ToLower(aliasKey))
+	if aliasKey == "" {
+		return nil
+	}
+	_, err := r.db.ExecContext(ctx,
+		`INSERT INTO user_exercise_aliases (user_id, alias_key, variant_id)
+		 VALUES ($1, $2, $3)
+		 ON CONFLICT (user_id, alias_key) DO NOTHING`,
+		userID, aliasKey, variantID,
+	)
+	return err
+}
+
 func scanCategories(rows *sql.Rows) ([]*Category, error) {
 	var out []*Category
 	for rows.Next() {
