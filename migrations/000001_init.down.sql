@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS ai_usage;
+DROP TABLE IF EXISTS personal_records;
+DROP TABLE IF EXISTS notes;
+DROP TABLE IF EXISTS log_entry_sets;
+DROP TABLE IF EXISTS log_entries;
+DROP TABLE IF EXISTS workout_sessions;
+DROP TABLE IF EXISTS exercise_variants;
+DROP TABLE IF EXISTS exercise_categories;
+DROP TABLE IF EXISTS users;
