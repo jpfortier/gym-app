@@ -12,14 +12,14 @@ import (
 
 // ParsedIntent is the structured output from the LLM.
 type ParsedIntent struct {
-	Intent string `json:"intent"` // "log" | "query" | "correction" | "unknown"
+	Intent string `json:"intent"` // "log" | "query" | "correction" | "remove" | "unknown"
 	// Log
 	Date      string          `json:"date,omitempty"`      // YYYY-MM-DD
 	Exercises []ParsedExercise `json:"exercises,omitempty"`
-	// Query + Correction
+	// Query + Correction + Remove
 	Category  string            `json:"category,omitempty"`
 	Variant   string            `json:"variant,omitempty"`
-	TargetRef string            `json:"target_ref,omitempty"` // for correction
+	TargetRef string            `json:"target_ref,omitempty"` // for correction: "last bench"; for remove: "last", "that"
 	Changes   *ParsedCorrection `json:"changes,omitempty"`
 }
 
@@ -50,6 +50,9 @@ Output format (one of):
   Use "standard" for default variant. Date: use today's date ({{.Today}}) unless user says yesterday, last Tuesday, etc.
 - Query: {"intent":"query","category":"bench press","variant":"standard"}
 - Correction: {"intent":"correction","target_ref":"last bench","changes":{"weight":150}}
+- Remove: {"intent":"remove","category":"bench press","variant":"standard","target_ref":"last"}
+  User wants to delete/remove/undo a logged entry. Phrases: "forget that", "remove it", "delete the last bench", "undo that", "scratch that".
+  If user says "forget that" or "remove it" without naming exercise, omit category/variant (we remove most recent entry). Otherwise use category and variant. target_ref: "last" or "that".
 - Unclear: {"intent":"unknown"}
 
 Rules:
@@ -87,6 +90,13 @@ func (p *parserImpl) parseMock(text string) (*ParsedIntent, error) {
 	}
 	if strings.Contains(text, "change") || strings.Contains(text, "correct") || strings.Contains(text, "wrong") {
 		return &ParsedIntent{Intent: "correction", TargetRef: "last", Changes: &ParsedCorrection{Weight: ptrFloat(150)}}, nil
+	}
+	if strings.Contains(text, "forget") || strings.Contains(text, "remove") || strings.Contains(text, "delete") ||
+		strings.Contains(text, "undo") || strings.Contains(text, "scratch") {
+		if strings.Contains(text, "bench") {
+			return &ParsedIntent{Intent: "remove", Category: "bench press", Variant: "standard", TargetRef: "last"}, nil
+		}
+		return &ParsedIntent{Intent: "remove", TargetRef: "that"}, nil
 	}
 	w := 135.0
 	return &ParsedIntent{

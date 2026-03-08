@@ -3,6 +3,7 @@ package logentry
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -118,6 +119,33 @@ func (r *Repo) ListByUserAndVariantWithDateRange(ctx context.Context, userID, va
 	return entries, rows.Err()
 }
 
+func (r *Repo) GetMostRecentEntryForUser(ctx context.Context, userID uuid.UUID, date string) (*LogEntry, error) {
+	if date == "" {
+		date = time.Now().Format("2006-01-02")
+	}
+	var e LogEntry
+	err := r.db.QueryRowContext(ctx,
+		`SELECT e.id, e.session_id, e.exercise_variant_id, COALESCE(e.raw_speech,''), COALESCE(e.notes,''), e.disabled_at, e.created_at
+		 FROM log_entries e
+		 JOIN workout_sessions s ON e.session_id = s.id
+		 WHERE s.user_id = $1 AND e.disabled_at IS NULL AND s.date = $2::date
+		 ORDER BY e.created_at DESC LIMIT 1`,
+		userID, date,
+	).Scan(&e.ID, &e.SessionID, &e.ExerciseVariantID, &e.RawSpeech, &e.Notes, &e.DisabledAt, &e.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	sets, err := r.setsForEntry(ctx, e.ID)
+	if err != nil {
+		return nil, err
+	}
+	e.Sets = sets
+	return &e, nil
+}
+
 func (r *Repo) ListBySession(ctx context.Context, sessionID uuid.UUID) ([]*LogEntry, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, session_id, exercise_variant_id, COALESCE(raw_speech,''), COALESCE(notes,''), disabled_at, created_at
@@ -167,6 +195,20 @@ func (r *Repo) setsForEntry(ctx context.Context, entryID uuid.UUID) ([]LogEntryS
 		sets = append(sets, s)
 	}
 	return sets, rows.Err()
+}
+
+func (r *Repo) DisableEntry(ctx context.Context, entryID uuid.UUID, userID uuid.UUID) (bool, error) {
+	res, err := r.db.ExecContext(ctx,
+		`UPDATE log_entries SET disabled_at = now()
+		 WHERE id = $1 AND session_id IN (SELECT id FROM workout_sessions WHERE user_id = $2)
+		 AND disabled_at IS NULL`,
+		entryID, userID,
+	)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
 }
 
 func (r *Repo) UpdateSet(ctx context.Context, setID uuid.UUID, weight *float64, reps *int) error {

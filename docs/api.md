@@ -32,11 +32,13 @@ All log creation goes through POST /chat. No manual write endpoint.
 ## POST /chat
 
 - **Request:** `{ "text": "..." }` or `{ "audio_base64": "..." }` (optional `audio_format`, e.g. `"m4a"`)
-- **Response:** Varies by intent (log, query, correction). Server infers via LLM.
+- **Response:** Varies by intent (log, query, correction, remove). Server infers via LLM.
 - **Auth:** `Authorization: Bearer <google_id_token>`
 - **Throttling:** Per-user rate limits. See `docs/ai-throttling.md`. Set `OPENAI_TEST_MODE=true` for tests.
 
 **Exercise resolution (log intent):** Resolves exercise names (e.g. "RDL") to category/variant. Order: exact match → user alias lookup → embedding similarity → create new. When we resolve via embedding or create, we store the alias so future lookups skip the LLM.
+
+**Remove intent:** User says "forget that", "remove it", "delete the last bench", "undo that", "scratch that". Soft-deletes (disables) the matching log entry. If no exercise specified, removes the most recent entry for today.
 
 ## GET /prs/{id}/image
 

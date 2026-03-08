@@ -75,7 +75,7 @@ One per user per day (or explicit session).
 - `exercise_variant_id` uuid FK → exercise_variants
 - `raw_speech` text — exact text the user said for this exercise block (e.g. "back squat 105", "100 pushups"). Per-exercise segment, not the full paragraph. Enables reprocessing if parsing improves.
 - `notes` text
-- `disabled_at` timestamptz — soft delete
+- `disabled_at` timestamptz — soft delete (set when user says "remove", "forget that", etc.)
 - `created_at` timestamptz
 
 ### log_entry_sets

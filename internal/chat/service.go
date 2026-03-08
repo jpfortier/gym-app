@@ -119,8 +119,10 @@ func (s *Service) Process(ctx context.Context, userID uuid.UUID, text string, au
 		return s.handleQuery(ctx, userID, intent)
 	case "correction":
 		return s.handleCorrection(ctx, userID, intent)
+	case "remove":
+		return s.handleRemove(ctx, userID, intent)
 	default:
-		return &Response{Intent: "unknown", Message: "I didn't understand. Try logging a workout, asking about your history, or correcting a previous entry."}, nil
+		return &Response{Intent: "unknown", Message: "I didn't understand. Try logging a workout, asking about your history, correcting a previous entry, or removing something."}, nil
 	}
 }
 
@@ -216,6 +218,39 @@ func (s *Service) handleQuery(ctx context.Context, userID uuid.UUID, intent *ai.
 		Intent:  "query",
 		History: &HistoryResult{ExerciseName: catName, VariantName: v.Name, Entries: out},
 	}, nil
+}
+
+func (s *Service) handleRemove(ctx context.Context, userID uuid.UUID, intent *ai.ParsedIntent) (*Response, error) {
+	date := intent.Date
+	if date == "" {
+		date = time.Now().Format("2006-01-02")
+	}
+	var entry *logentry.LogEntry
+	if intent.Category != "" && intent.Variant != "" {
+		v, err := s.exerciseRepo.Resolve(ctx, userID, intent.Category, intent.Variant)
+		if err != nil || v == nil {
+			return &Response{Intent: "remove", Message: "Couldn't find that exercise."}, nil
+		}
+		entries, err := s.logentryRepo.ListByUserAndVariantWithDateRange(ctx, userID, v.ID, date, date, 1)
+		if err != nil || len(entries) == 0 {
+			return &Response{Intent: "remove", Message: "No matching entry found to remove."}, nil
+		}
+		entry = entries[0]
+	} else {
+		var err error
+		entry, err = s.logentryRepo.GetMostRecentEntryForUser(ctx, userID, date)
+		if err != nil || entry == nil {
+			return &Response{Intent: "remove", Message: "No entry found to remove."}, nil
+		}
+	}
+	ok, err := s.logentryRepo.DisableEntry(ctx, entry.ID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return &Response{Intent: "remove", Message: "Couldn't remove that entry."}, nil
+	}
+	return &Response{Intent: "remove", Message: "Removed."}, nil
 }
 
 func (s *Service) handleCorrection(ctx context.Context, userID uuid.UUID, intent *ai.ParsedIntent) (*Response, error) {
