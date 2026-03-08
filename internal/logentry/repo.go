@@ -70,6 +70,38 @@ func (r *Repo) GetByID(ctx context.Context, id uuid.UUID) (*LogEntry, error) {
 	return &e, nil
 }
 
+func (r *Repo) ListByUserAndVariant(ctx context.Context, userID, variantID uuid.UUID, limit int) ([]*LogEntry, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT e.id, e.session_id, e.exercise_variant_id, COALESCE(e.raw_speech,''), COALESCE(e.notes,''), e.disabled_at, e.created_at
+		 FROM log_entries e
+		 JOIN workout_sessions s ON e.session_id = s.id
+		 WHERE s.user_id = $1 AND e.exercise_variant_id = $2 AND e.disabled_at IS NULL
+		 ORDER BY e.created_at DESC LIMIT $3`,
+		userID, variantID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var entries []*LogEntry
+	for rows.Next() {
+		var e LogEntry
+		if err := rows.Scan(&e.ID, &e.SessionID, &e.ExerciseVariantID, &e.RawSpeech, &e.Notes, &e.DisabledAt, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		sets, err := r.setsForEntry(ctx, e.ID)
+		if err != nil {
+			return nil, err
+		}
+		e.Sets = sets
+		entries = append(entries, &e)
+	}
+	return entries, rows.Err()
+}
+
 func (r *Repo) ListBySession(ctx context.Context, sessionID uuid.UUID) ([]*LogEntry, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, session_id, exercise_variant_id, COALESCE(raw_speech,''), COALESCE(notes,''), disabled_at, created_at

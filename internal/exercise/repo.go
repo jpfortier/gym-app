@@ -140,6 +140,32 @@ func (r *Repo) GetVariantByCategoryAndName(ctx context.Context, categoryID uuid.
 	return &v, nil
 }
 
+func (r *Repo) ListVariantsByCategory(ctx context.Context, categoryID uuid.UUID, userID uuid.UUID) ([]*Variant, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, category_id, user_id, name, created_at FROM exercise_variants
+		 WHERE category_id = $1 AND (user_id IS NULL OR user_id = $2) ORDER BY name`,
+		categoryID, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*Variant
+	for rows.Next() {
+		var v Variant
+		var uid sql.NullString
+		if err := rows.Scan(&v.ID, &v.CategoryID, &uid, &v.Name, &v.CreatedAt); err != nil {
+			return nil, err
+		}
+		if uid.Valid {
+			u, _ := uuid.Parse(uid.String)
+			v.UserID = &u
+		}
+		out = append(out, &v)
+	}
+	return out, rows.Err()
+}
+
 func (r *Repo) ListCategoriesForUser(ctx context.Context, userID uuid.UUID) ([]*Category, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, user_id, name, show_weight, show_reps, created_at FROM exercise_categories

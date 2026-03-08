@@ -8,13 +8,13 @@
 - [x] Log entry repo + service
 - [x] Exercise repo + basic resolution
 - [x] GET /sessions, GET /sessions/:id
-- [ ] Query service, GET /exercises, GET /prs
+- [x] Query service, GET /exercises, GET /prs
 - [ ] AI layer (POST /chat, Whisper, parse, etc.)
 - [ ] PR detection, DALL-E + R2
 
 ## Next
 
-Query service, GET /exercises, GET /prs.
+AI layer (POST /chat, Whisper, parse, etc.).
 
 ## Segments (V1)
 
