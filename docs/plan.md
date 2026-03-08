@@ -35,15 +35,14 @@ Validate core flow via tests. All creation goes through chat.
 - **Default date:** Assume today. LLM prompt instructs: user is logging in the moment unless they specify otherwise.
 - **Session creation:** First log of the day creates a new workout session automatically. No confirmation. "Add to yesterday" — create session for that date if it doesn't exist. Support relative dates.
 - **PR detection:** When processing a log intent, check if the logged sets establish a new PR (natural set or 1RM). If so, create PR record and trigger DALL-E image generation.
-- **PR images:** DALL-E 3 per PR. Background job (~30 sec). Upload to R2 at `pr/{user_id}/{pr_id}.png`. Update `personal_records.image_url`. Notify client via FCM.
+- **PR images:** DALL-E 3 per PR. Background job (~30 sec). Upload to R2 at `pr/{user_id}/{pr_id}.png`. Update `personal_records.image_url`. V1: client polls. V2: FCM.
 
 ## PR Image Ready (Client)
 
-- **Foreground on PR screen:** FCM data message arrives → update UI immediately. No system notification. Or poll for ~60 sec.
-- **Background/closed:** FCM notification message → system shows "Your PR image is ready!" → tap opens app.
-- Send both `notification` and `data` payloads; client handles per app state.
+- **V1:** Client polls GET /prs/:id until image_url set, or polls on PR screen for ~60 sec.
+- **V2:** FCM data message (foreground) or notification (background/closed).
 
-## Notifications
+## Notifications (V2)
 
 - **FCM** for all event notifications: PR image ready, Jim's PR, new workout, etc.
 - Store device tokens per user. Backend sends to FCM when events occur.

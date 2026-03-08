@@ -26,10 +26,26 @@
 - **Download:** Direct from R2 via presigned URLs. Backend validates ownership, returns time-limited URL. Client fetches from R2.
 - **Sharing:** Same object stays in R2; no copy. Sharing = backend generates presigned URL with longer expiry. Private bucket.
 - **PR image flow:** DALL-E generates (~30 sec) → background job uploads to R2 → updates `personal_records.image_url` → notifies client.
-- **Notifications:** FCM (Firebase Cloud Messaging) for all events: PR image ready, Jim's PR, new workout, etc.
-- **PR image ready (in-app):** When user is on PR screen: poll for ~60 sec OR receive FCM data message and update UI immediately (no system notification). When app background/closed: FCM notification message so user gets phone notification. Send both `notification` + `data` payloads; foreground handler decides whether to show.
+- **Notifications:** V2. FCM for PR image ready, Jim's PR, new workout, etc.
+- **PR image ready (V1):** Client polls GET /prs/:id until image_url set. V2: FCM.
 - **Admin panel:** Alpine.js + Go templates. Same backend. Server-rendered HTML, Alpine for interactivity. Dashboard (higher-level views) + raw table CRUD.
 - **Roles:** `users.role` — 'user' | 'coach' | 'owner' | 'admin'. No boolean flags. One user (me) has 'admin'. Same Google Sign-In; middleware checks role for admin routes. Set admin manually: `UPDATE users SET role = 'admin' WHERE email = 'your@email.com';`
+
+## Development workflow
+
+Build segment by segment. Each segment gets a test before moving on.
+
+1. **Create one segment/block** — Implement the feature.
+2. **Write a test for it** — Test must pass before proceeding.
+3. **Create the next segment** — Implement.
+4. **Write a test for the new segment** — Test must pass.
+5. **Write an integration test** — Test the two segments together.
+6. **Repeat** — Each feature needs a test. Run tests continuously.
+
+**Test structure:**
+- **Shared setup** — Authenticate/login once at the beginning of a test file or suite. Don't duplicate auth/setup across every test.
+- **Cleanup** — Clean up after each test (e.g. delete created data, reset state). Tests should not leave side effects.
+- **Logout/teardown** — If you logged in, log out or tear down at the end.
 
 ## Migrations (release command)
 
@@ -43,7 +59,7 @@ Migrations run automatically before each deploy via `release_command`. Requires 
 
 **Migrate CLI:** Install with postgres driver: `go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest`. Ensure `$(go env GOPATH)/bin` is in PATH.
 
-**DATABASE_URL conflict:** If you have `DATABASE_URL` set in your shell (e.g. for another project), it overrides `.env`. Either unset it before `make migrate-up`, or run with an explicit URL: `DATABASE_URL="postgres://postgres:gym-dev-2025@localhost:15432/postgres?sslmode=disable" make migrate-up`.
+**DATABASE_URL conflict:** If you have `DATABASE_URL` set in your shell (e.g. for another project), it overrides `.env`. Use `make migrate-up` and `make test` — both source `.env` so gym's DATABASE_URL takes precedence.
 
 **Reset password** (if needed): `printf 'ALTER USER postgres PASSWORD '\''newpass'\'';\n\\q\n' | fly postgres connect -a gym-app-pg`
 
@@ -59,7 +75,7 @@ Migrations run automatically before each deploy via `release_command`. Requires 
 | `R2_SECRET_ACCESS_KEY` | When R2 | R2 API secret |
 | `R2_BUCKET` | When R2 | Bucket name (gym-app) |
 | `FCM_CREDENTIALS_PATH` | When FCM | Path to Firebase service account JSON |
-| `OPENAI_API_KEY` | When AI | OpenAI API key |
+| `OPENAI_API_KEY` | When AI | OpenAI API key. Create at https://platform.openai.com/api-keys. Add to .env. Verify: `make verify-openai` |
 
 Copy `.env.example` to `.env`. Unset optional vars are ignored; app works without R2/FCM/OpenAI until those features are used.
 
