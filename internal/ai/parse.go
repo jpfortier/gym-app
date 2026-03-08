@@ -113,12 +113,18 @@ func (p *parserImpl) parseReal(ctx context.Context, userID uuid.UUID, text strin
 	if err != nil {
 		return nil, fmt.Errorf("parse: %w", err)
 	}
-	// Strip markdown code blocks if present
+	// Strip markdown code blocks and extract JSON (LLM sometimes wraps in ```json ... ``` or adds trailing text)
 	body := strings.TrimSpace(resp)
-	if strings.HasPrefix(body, "```") {
-		body = strings.TrimPrefix(body, "```json")
-		body = strings.TrimPrefix(body, "```")
-		body = strings.TrimSpace(body)
+	body = strings.TrimPrefix(body, "```json")
+	body = strings.TrimPrefix(body, "```")
+	body = strings.TrimSpace(body)
+	if idx := strings.Index(body, "```"); idx >= 0 {
+		body = body[:idx]
+	}
+	if start := strings.Index(body, "{"); start >= 0 {
+		if end := strings.LastIndex(body, "}"); end >= start {
+			body = body[start : end+1]
+		}
 	}
 	var out ParsedIntent
 	if err := json.Unmarshal([]byte(body), &out); err != nil {

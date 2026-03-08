@@ -56,9 +56,10 @@ type Service struct {
 	sessionSvc    *session.Service
 	logentrySvc   *logentry.Service
 	logentryRepo  *logentry.Repo
+	exerciseSvc   *exercise.Service
 	exerciseRepo  *exercise.Repo
 	querySvc      *query.Service
-	correctionSvc  *correction.Service
+	correctionSvc *correction.Service
 	prSvc         *pr.Service
 	prRepo        *pr.Repo
 	r2            *storage.R2
@@ -70,6 +71,7 @@ func NewService(
 	sessionSvc *session.Service,
 	logentrySvc *logentry.Service,
 	logentryRepo *logentry.Repo,
+	exerciseSvc *exercise.Service,
 	exerciseRepo *exercise.Repo,
 	querySvc *query.Service,
 	correctionSvc *correction.Service,
@@ -83,6 +85,7 @@ func NewService(
 		sessionSvc:   sessionSvc,
 		logentrySvc:  logentrySvc,
 		logentryRepo: logentryRepo,
+		exerciseSvc:  exerciseSvc,
 		exerciseRepo: exerciseRepo,
 		querySvc:     querySvc,
 		correctionSvc: correctionSvc,
@@ -93,10 +96,11 @@ func NewService(
 }
 
 // Process handles text or audio and returns the response.
-func (s *Service) Process(ctx context.Context, userID uuid.UUID, text string, audioBase64 string) (*Response, error) {
+// audioFormat is optional (e.g. "m4a", "webm"); used when audioBase64 is provided.
+func (s *Service) Process(ctx context.Context, userID uuid.UUID, text string, audioBase64 string, audioFormat string) (*Response, error) {
 	if text == "" && audioBase64 != "" {
 		var err error
-		text, err = s.client.Transcribe(ctx, userID, audioBase64)
+		text, err = s.client.Transcribe(ctx, userID, audioBase64, audioFormat)
 		if err != nil {
 			return nil, fmt.Errorf("transcribe: %w", err)
 		}
@@ -128,7 +132,7 @@ func (s *Service) handleLog(ctx context.Context, userID uuid.UUID, intent *ai.Pa
 	var results []LogResult
 	var allPRs []PRResult
 	for _, ex := range intent.Exercises {
-		variant, err := s.exerciseRepo.Resolve(ctx, userID, strings.ToLower(ex.ExerciseName), strings.ToLower(ex.VariantName))
+		variant, err := s.exerciseSvc.ResolveOrCreate(ctx, userID, strings.ToLower(ex.ExerciseName), strings.ToLower(ex.VariantName))
 		if err != nil {
 			return nil, err
 		}

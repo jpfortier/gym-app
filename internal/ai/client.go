@@ -34,7 +34,8 @@ func NewClient(throttle *Throttler) *Client {
 }
 
 // Transcribe decodes base64 audio and returns text. Throttled.
-func (c *Client) Transcribe(ctx context.Context, userID uuid.UUID, audioBase64 string) (string, error) {
+// fileExt is optional (e.g. "m4a", "webm"); defaults to "webm" if empty.
+func (c *Client) Transcribe(ctx context.Context, userID uuid.UUID, audioBase64 string, fileExt string) (string, error) {
 	if c.testMode {
 		return "bench press 135 for 8", nil
 	}
@@ -45,9 +46,12 @@ func (c *Client) Transcribe(ctx context.Context, userID uuid.UUID, audioBase64 s
 	if err != nil {
 		return "", fmt.Errorf("decode audio: %w", err)
 	}
+	if fileExt == "" {
+		fileExt = "webm"
+	}
 	req := openai.AudioRequest{
 		Model:    openai.Whisper1,
-		FilePath: "audio.webm",
+		FilePath: "audio." + fileExt,
 		Reader:   bytes.NewReader(data),
 	}
 	resp, err := c.client.CreateTranscription(ctx, req)

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/pgvector/pgvector-go"
 
 	"github.com/jpfortier/gym-app/internal/db"
 )
@@ -152,6 +153,78 @@ func (r *Repo) ListCategoriesForUser(ctx context.Context, userID uuid.UUID) ([]*
 	}
 	defer rows.Close()
 	return scanCategories(rows)
+}
+
+func (r *Repo) FindCategoryByEmbedding(ctx context.Context, userID uuid.UUID, emb []float32, maxDistance float32) (*Category, error) {
+	if len(emb) == 0 {
+		return nil, nil
+	}
+	vec := pgvector.NewVector(emb)
+	var c Category
+	var uid sql.NullString
+	err := r.db.QueryRowContext(ctx,
+		`SELECT id, user_id, name, show_weight, show_reps, created_at
+		 FROM exercise_categories
+		 WHERE (user_id IS NULL OR user_id = $1) AND embedding IS NOT NULL
+		   AND (embedding <=> $2) < $3
+		 ORDER BY embedding <=> $2 LIMIT 1`,
+		userID, vec, maxDistance,
+	).Scan(&c.ID, &uid, &c.Name, &c.ShowWeight, &c.ShowReps, &c.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	c.UserID = db.NullStringToUUIDPtr(uid)
+	return &c, nil
+}
+
+func (r *Repo) FindVariantByEmbedding(ctx context.Context, categoryID uuid.UUID, userID uuid.UUID, emb []float32, maxDistance float32) (*Variant, error) {
+	if len(emb) == 0 {
+		return nil, nil
+	}
+	vec := pgvector.NewVector(emb)
+	var v Variant
+	var uid sql.NullString
+	err := r.db.QueryRowContext(ctx,
+		`SELECT id, category_id, user_id, name, created_at
+		 FROM exercise_variants
+		 WHERE category_id = $1 AND (user_id IS NULL OR user_id = $2) AND embedding IS NOT NULL
+		   AND (embedding <=> $3) < $4
+		 ORDER BY embedding <=> $3 LIMIT 1`,
+		categoryID, userID, vec, maxDistance,
+	).Scan(&v.ID, &v.CategoryID, &uid, &v.Name, &v.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	v.UserID = db.NullStringToUUIDPtr(uid)
+	return &v, nil
+}
+
+func (r *Repo) UpdateCategoryEmbedding(ctx context.Context, id uuid.UUID, emb []float32) error {
+	if len(emb) == 0 {
+		return nil
+	}
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE exercise_categories SET embedding = $1 WHERE id = $2`,
+		pgvector.NewVector(emb), id,
+	)
+	return err
+}
+
+func (r *Repo) UpdateVariantEmbedding(ctx context.Context, id uuid.UUID, emb []float32) error {
+	if len(emb) == 0 {
+		return nil
+	}
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE exercise_variants SET embedding = $1 WHERE id = $2`,
+		pgvector.NewVector(emb), id,
+	)
+	return err
 }
 
 func scanCategories(rows *sql.Rows) ([]*Category, error) {

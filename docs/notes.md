@@ -59,6 +59,8 @@ Migrations run automatically before each deploy via `release_command`. Requires 
 
 **Migrate CLI:** Install with postgres driver: `go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest`. Ensure `$(go env GOPATH)/bin` is in PATH.
 
+**pgvector (migration 000008):** Embeddings require the pgvector extension. For Fly Postgres Flex: use `ziadm/postgres-flex-pgvector:17.2` image (`fly image update --image ziadm/postgres-flex-pgvector:17.2 -a gym-app-pg -y`), then `CREATE EXTENSION vector` and run migrations. For Fly MPG: enable in dashboard → Postgres (Beta) → Extensions. For local: `brew install pgvector`.
+
 **DATABASE_URL conflict:** If you have `DATABASE_URL` set in your shell (e.g. for another project), it overrides `.env`. Use `make migrate-up` and `make test` — both source `.env` so gym's DATABASE_URL takes precedence.
 
 **Reset password** (if needed): `printf 'ALTER USER postgres PASSWORD '\''newpass'\'';\n\\q\n' | fly postgres connect -a gym-app-pg`

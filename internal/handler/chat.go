@@ -22,12 +22,13 @@ func Chat(chatSvc *chat.Service) http.HandlerFunc {
 		var req struct {
 			Text        string `json:"text"`
 			AudioBase64 string `json:"audio_base64"`
+			AudioFormat string `json:"audio_format"` // e.g. "m4a", "webm" - optional
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			JSONError(w, "invalid JSON", "invalid_input", http.StatusBadRequest)
 			return
 		}
-		resp, err := chatSvc.Process(r.Context(), u.ID, req.Text, req.AudioBase64)
+		resp, err := chatSvc.Process(r.Context(), u.ID, req.Text, req.AudioBase64, req.AudioFormat)
 		if err != nil {
 			JSONError(w, "processing failed", "internal_error", http.StatusInternalServerError)
 			return

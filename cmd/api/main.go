@@ -42,9 +42,10 @@ func main() {
 
 	throttle := ai.NewThrottlerFromEnv()
 	aiClient := ai.NewClient(throttle)
+	exerciseSvc := exercise.NewService(exerciseRepo, aiClient)
 	parser := ai.NewParser(aiClient)
 	r2, _ := storage.NewR2()
-	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseRepo, queryService, correctionSvc, prSvc, prRepo, r2)
+	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, queryService, correctionSvc, prSvc, prRepo, r2)
 
 	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
 

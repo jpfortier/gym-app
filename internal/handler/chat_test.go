@@ -41,6 +41,7 @@ func TestChat_logIntent(t *testing.T) {
 	sessionRepo := session.NewRepo(db)
 	logentryRepo := logentry.NewRepo(db)
 	exerciseRepo := exercise.NewRepo(db)
+	exerciseSvc := exercise.NewService(exerciseRepo, aiClient)
 	prRepo := pr.NewRepo(db)
 	sessionSvc := session.NewService(sessionRepo)
 	logentrySvc := logentry.NewService(logentryRepo, sessionSvc)
@@ -48,7 +49,7 @@ func TestChat_logIntent(t *testing.T) {
 	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
 	prSvc := pr.NewService(prRepo)
 
-	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil)
+	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
 	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(Chat(chatSvc))))

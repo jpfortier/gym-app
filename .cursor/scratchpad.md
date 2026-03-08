@@ -52,6 +52,8 @@ Segment by segment. For each segment: implement → test → verify. Then integr
 
 - Migration 000006: users.role. Run `make migrate-up` when DB is available.
 
+- Migration 000008 (embeddings): Requires pgvector. **Fly Postgres Flex:** Use `ziadm/postgres-flex-pgvector:17.2` image. **Local:** `brew install pgvector`. No fallback—if extension missing, embedding ops fail (by design).
+
 - R2 for PR images, user photos. Path `pr/{user_id}/{pr_id}.png`. Backend proxy uploads only; presigned URLs for download.
 - FCM for notifications. PR image ready: foreground = update UI (no notification); background/closed = system notification.
 
