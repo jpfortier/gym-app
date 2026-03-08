@@ -3,13 +3,13 @@ package query
 import (
 	"context"
 	"database/sql"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
+	"github.com/jpfortier/gym-app/internal/env"
 	"github.com/jpfortier/gym-app/internal/exercise"
 	"github.com/jpfortier/gym-app/internal/logentry"
 	"github.com/jpfortier/gym-app/internal/session"
@@ -18,7 +18,7 @@ import (
 
 func dbForTest(t *testing.T) *sql.DB {
 	t.Helper()
-	connStr := os.Getenv("DATABASE_URL")
+	connStr := env.DatabaseURL()
 	if connStr == "" {
 		connStr = "postgres://postgres:gym-dev-2025@localhost:15432/postgres?sslmode=disable"
 	}

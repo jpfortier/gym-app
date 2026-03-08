@@ -4,15 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+
+	"github.com/jpfortier/gym-app/internal/env"
 )
 
 func New(ctx context.Context) (*sql.DB, error) {
-	connStr := os.Getenv("DATABASE_URL")
+	connStr := env.DatabaseURL()
 	if connStr == "" {
-		return nil, fmt.Errorf("DATABASE_URL not set")
+		return nil, fmt.Errorf("GYM_DATABASE_URL not set")
 	}
 
 	db, err := sql.Open("pgx", connStr)

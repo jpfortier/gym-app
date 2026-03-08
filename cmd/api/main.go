@@ -4,11 +4,12 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/jpfortier/gym-app/internal/ai"
 	"github.com/jpfortier/gym-app/internal/auth"
+	"github.com/jpfortier/gym-app/internal/env"
 	"github.com/jpfortier/gym-app/internal/chat"
+	"github.com/jpfortier/gym-app/internal/chatmessages"
 	"github.com/jpfortier/gym-app/internal/correction"
 	"github.com/jpfortier/gym-app/internal/db"
 	"github.com/jpfortier/gym-app/internal/exercise"
@@ -43,15 +44,16 @@ func main() {
 	prSvc := pr.NewService(prRepo)
 	notesRepo := notes.NewRepo(database)
 	usageRepo := usage.NewRepo(database)
+	chatMessagesRepo := chatmessages.NewRepo(database)
 
 	throttle := ai.NewThrottlerFromEnv()
 	aiClient := ai.NewClient(throttle, usageRepo)
 	exerciseSvc := exercise.NewService(exerciseRepo, aiClient)
 	parser := ai.NewParser(aiClient)
 	r2, _ := storage.NewR2()
-	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, queryService, correctionSvc, prSvc, prRepo, notesRepo, r2)
+	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, queryService, correctionSvc, prSvc, prRepo, notesRepo, chatMessagesRepo, r2)
 
-	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
+	googleClientID := env.GoogleClientID()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", handler.Health(database))
@@ -66,7 +68,7 @@ func main() {
 		mux.Handle("GET /prs/{id}/image", auth.RequireAuth(auth.GoogleVerifier{}, userRepo, googleClientID)(http.HandlerFunc(handler.PRImage(prRepo, r2))))
 	}
 
-	port := os.Getenv("PORT")
+	port := env.Port()
 	if port == "" {
 		port = "8081"
 	}

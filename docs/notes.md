@@ -19,6 +19,7 @@
 - **Intent:** Client never chooses. Single POST /chat; LLM infers log vs query vs correction vs note.
 - **Note intent:** Phrases like "remember for RDLs: warm up hamstrings", "note for deadlift: brace core" infer note intent. Notes stored in `notes` table, scoped to user and optionally category/variant. Discussion point for AI to surface relevant notes when user logs that exercise.
 - **AI usage:** Token usage persisted to `ai_usage` per user for Chat, Transcribe, Embed, DALL-E. Cost tracking and admin dashboards.
+- **Chat context:** Conversation history in `chat_messages` for context-aware parsing. Sliding window (last 6 messages) passed to parser. Enables "and another one for 150", "change that", "remove that". Retention: keep forever. See `docs/chat-context.md`.
 - **Log structure:** Block + sets (log_entries + log_entry_sets). Supports ramp/pyramid.
 - **raw_speech:** Store the exact text the user said for each exercise block (per-exercise segment, not full paragraph). Enables reprocessing if parsing improves.
 - **Partial logging:** User may say only the peak ("squats 195×1") or all sets. LLM parses what they say; we store exactly that. No inferring warm-up sets.
@@ -52,19 +53,19 @@ Build segment by segment. Each segment gets a test before moving on.
 
 ## Migrations (release command)
 
-Migrations run automatically before each deploy via `release_command`. Requires `DATABASE_URL` secret on gym-app. Set with `fly postgres attach gym-app-pg --app gym-app` (creates secret) or `fly secrets set DATABASE_URL="postgres://..." -a gym-app`.
+Migrations run automatically before each deploy via `release_command`. Requires `GYM_DATABASE_URL` or `DATABASE_URL` (Fly postgres attach sets `DATABASE_URL`). Set with `fly postgres attach gym-app-pg --app gym-app` or `fly secrets set GYM_DATABASE_URL="postgres://..." -a gym-app`.
 
 ## Local DB setup
 
 1. Start proxy: `fly proxy 15432:5432 -a gym-app-pg`
-2. Copy `.env.example` to `.env` and set `DATABASE_URL=postgres://postgres:gym-dev-2025@localhost:15432/postgres?sslmode=disable`
-3. Run migrations: `make migrate-up` (or `migrate -path migrations -database $DATABASE_URL up`)
+2. Copy `.env.example` to `.env` and set `GYM_DATABASE_URL=postgres://postgres:gym-dev-2025@localhost:15432/postgres?sslmode=disable`
+3. Run migrations: `make migrate-up` (or `migrate -path migrations -database $GYM_DATABASE_URL up`)
 
 **Migrate CLI:** Install with postgres driver: `go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest`. Ensure `$(go env GOPATH)/bin` is in PATH.
 
 **pgvector (migration 000008):** Embeddings require the pgvector extension. For Fly Postgres Flex: use `ziadm/postgres-flex-pgvector:17.2` image (`fly image update --image ziadm/postgres-flex-pgvector:17.2 -a gym-app-pg -y`), then `CREATE EXTENSION vector` and run migrations. For Fly MPG: enable in dashboard → Postgres (Beta) → Extensions. For local: `brew install pgvector`.
 
-**DATABASE_URL conflict:** If you have `DATABASE_URL` set in your shell (e.g. for another project), it overrides `.env`. Use `make migrate-up` and `make test` — both source `.env` so gym's DATABASE_URL takes precedence.
+**GYM_ prefix:** All gym env vars use `GYM_` prefix (e.g. `GYM_DATABASE_URL`) to avoid collisions with other projects. If you have `DATABASE_URL` set in your shell for worklist or another project, gym will use `GYM_DATABASE_URL` from `.env` instead.
 
 **Reset password** (if needed): `printf 'ALTER USER postgres PASSWORD '\''newpass'\'';\n\\q\n' | fly postgres connect -a gym-app-pg`
 
@@ -72,27 +73,27 @@ Migrations run automatically before each deploy via `release_command`. Requires 
 
 | Var | Required | Purpose |
 |-----|----------|---------|
-| `DATABASE_URL` | Yes | Postgres connection string |
-| `GOOGLE_CLIENT_ID` | Yes | OAuth2 client ID for Google Sign-In |
-| `PORT` | No | HTTP port (default 8081; Fly sets automatically) |
-| `R2_ACCOUNT_ID` | When R2 | Cloudflare account ID |
-| `R2_ACCESS_KEY_ID` | When R2 | R2 API token |
-| `R2_SECRET_ACCESS_KEY` | When R2 | R2 API secret |
-| `R2_BUCKET` | When R2 | Bucket name (gym-app) |
-| `FCM_CREDENTIALS_PATH` | When FCM | Path to Firebase service account JSON |
-| `OPENAI_API_KEY` | When AI | OpenAI API key. Create at https://platform.openai.com/api-keys. Add to .env. Verify: `make verify-openai` |
-| `OPENAI_TEST_MODE` | When AI | Set `true` for tests. Skips real API calls; uses mocks. **Prevents test suites from burning credits.** |
-| `OPENAI_RATE_PER_MINUTE` | No | Per-user rate limit (default 10). |
-| `OPENAI_DAILY_LIMIT` | No | Per-user daily cap (default 100). |
-| `OPENAI_DALLE_DAILY_LIMIT` | No | Per-user DALL-E cap (default 5). |
+| `GYM_DATABASE_URL` | Yes | Postgres connection string |
+| `GYM_GOOGLE_CLIENT_ID` | Yes | OAuth2 client ID for Google Sign-In |
+| `GYM_PORT` | No | HTTP port (default 8081; Fly sets PORT) |
+| `GYM_R2_ACCOUNT_ID` | When R2 | Cloudflare account ID |
+| `GYM_R2_ACCESS_KEY_ID` | When R2 | R2 API token |
+| `GYM_R2_SECRET_ACCESS_KEY` | When R2 | R2 API secret |
+| `GYM_R2_BUCKET` | When R2 | Bucket name (gym-app) |
+| `GYM_FCM_CREDENTIALS_PATH` | When FCM | Path to Firebase service account JSON |
+| `GYM_OPENAI_API_KEY` | When AI | OpenAI API key. Verify: `make verify-openai` |
+| `GYM_OPENAI_TEST_MODE` | When AI | Set `true` for tests. Skips real API calls; uses mocks. |
+| `GYM_OPENAI_RATE_PER_MINUTE` | No | Per-user rate limit (default 10). |
+| `GYM_OPENAI_DAILY_LIMIT` | No | Per-user daily cap (default 100). |
+| `GYM_OPENAI_DALLE_DAILY_LIMIT` | No | Per-user DALL-E cap (default 5). |
 
-**AI throttling:** See `docs/ai-throttling.md`. Tests must never call real OpenAI. Set `OPENAI_TEST_MODE=true` in `.env` when running `make test`.
+**AI throttling:** See `docs/ai-throttling.md`. Tests must never call real OpenAI. Set `GYM_OPENAI_TEST_MODE=true` in `.env` when running `make test`.
 
 Copy `.env.example` to `.env`. Unset optional vars are ignored; app works without R2/FCM/OpenAI until those features are used.
 
 ## Gotchas
 
-- **GOOGLE_CLIENT_ID:** Required for auth. OAuth2 client ID from Google Cloud Console (Android or Web client).
+- **GYM_GOOGLE_CLIENT_ID:** Required for auth. OAuth2 client ID from Google Cloud Console (Android or Web client).
 - **Fly Postgres connection:** Use `/postgres` in URL for default DB: `...@host:port/postgres?sslmode=disable`
 - **DBeaver:** Run `fly proxy 15432:5432 -a gym-app-pg`, connect to localhost:15432
 

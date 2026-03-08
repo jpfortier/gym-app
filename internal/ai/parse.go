@@ -68,11 +68,13 @@ Rules:
 - sets: weight in lbs, reps as int. set_order 1,2,3... set_type optional (working, warm-up, etc).
 - For bodyweight (push-ups, pull-ups): omit weight or null.
 - date: always YYYY-MM-DD. Infer "today" as {{.Today}}, "yesterday" as {{.Yesterday}}.
-- Output ONLY valid JSON, no markdown, no explanation.`
+- Output ONLY valid JSON, no markdown, no explanation.
+
+Context: You may receive recent conversation (User/Assistant turns) before the current message. Use it to resolve references like "that", "another one", "change it", "remove that" — they refer to the most recent relevant action.`
 
 // Parser parses user text into structured intent.
 type Parser interface {
-	Parse(ctx context.Context, userID uuid.UUID, text string) (*ParsedIntent, error)
+	Parse(ctx context.Context, userID uuid.UUID, text string, recentMessages []ChatMessage) (*ParsedIntent, error)
 }
 
 type parserImpl struct {
@@ -83,11 +85,11 @@ func NewParser(client *Client) Parser {
 	return &parserImpl{client: client}
 }
 
-func (p *parserImpl) Parse(ctx context.Context, userID uuid.UUID, text string) (*ParsedIntent, error) {
+func (p *parserImpl) Parse(ctx context.Context, userID uuid.UUID, text string, recentMessages []ChatMessage) (*ParsedIntent, error) {
 	if p.client.testMode {
 		return p.parseMock(text)
 	}
-	return p.parseReal(ctx, userID, text)
+	return p.parseReal(ctx, userID, text, recentMessages)
 }
 
 func (p *parserImpl) parseMock(text string) (*ParsedIntent, error) {
@@ -115,7 +117,7 @@ func (p *parserImpl) parseMock(text string) (*ParsedIntent, error) {
 	w := 135.0
 	return &ParsedIntent{
 		Intent: "log",
-		Date:   "2025-03-20",
+		Date:   time.Now().Format("2006-01-02"),
 		Exercises: []ParsedExercise{{
 			ExerciseName: "Bench Press",
 			VariantName:  "standard",
@@ -127,13 +129,17 @@ func (p *parserImpl) parseMock(text string) (*ParsedIntent, error) {
 
 func ptrFloat(f float64) *float64 { return &f }
 
-func (p *parserImpl) parseReal(ctx context.Context, userID uuid.UUID, text string) (*ParsedIntent, error) {
+func (p *parserImpl) parseReal(ctx context.Context, userID uuid.UUID, text string, recentMessages []ChatMessage) (*ParsedIntent, error) {
 	now := time.Now()
 	today := now.Format("2006-01-02")
 	yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
 	prompt := strings.ReplaceAll(parsePrompt, "{{.Today}}", today)
 	prompt = strings.ReplaceAll(prompt, "{{.Yesterday}}", yesterday)
-	resp, err := p.client.Chat(ctx, userID, []ChatMessage{{Role: "system", Content: prompt}, {Role: "user", Content: text}})
+	msgs := make([]ChatMessage, 0, 2+len(recentMessages)+1)
+	msgs = append(msgs, ChatMessage{Role: "system", Content: prompt})
+	msgs = append(msgs, recentMessages...)
+	msgs = append(msgs, ChatMessage{Role: "user", Content: text})
+	resp, err := p.client.Chat(ctx, userID, msgs)
 	if err != nil {
 		return nil, fmt.Errorf("parse: %w", err)
 	}

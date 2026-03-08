@@ -12,6 +12,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/jpfortier/gym-app/internal/ai"
+	"github.com/jpfortier/gym-app/internal/env"
 	"github.com/jpfortier/gym-app/internal/chat"
 	"github.com/jpfortier/gym-app/internal/correction"
 	"github.com/jpfortier/gym-app/internal/exercise"
@@ -26,11 +27,11 @@ import (
 // Requires OPENAI_API_KEY set and OPENAI_TEST_MODE not "true". Skips if not configured.
 // Run with: make test (or go test -v ./internal/handler -run TestChat_audioSamples)
 func TestChat_audioSamples(t *testing.T) {
-	if os.Getenv("OPENAI_API_KEY") == "" {
-		t.Skip("OPENAI_API_KEY not set, skipping audio integration test")
+	if env.OpenAIAPIKey() == "" {
+		t.Skip("GYM_OPENAI_API_KEY not set, skipping audio integration test")
 	}
-	if strings.ToLower(os.Getenv("OPENAI_TEST_MODE")) == "true" {
-		t.Skip("OPENAI_TEST_MODE=true, skipping audio integration test (use real API)")
+	if env.OpenAITestMode() {
+		t.Skip("GYM_OPENAI_TEST_MODE=true, skipping audio integration test (use real API)")
 	}
 
 	db := dbForTest(t)
@@ -60,7 +61,7 @@ func TestChat_audioSamples(t *testing.T) {
 	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
 	prSvc := pr.NewService(prRepo)
 
-	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, nil)
+	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, nil, nil)
 
 	// Resolve samples path: go test runs from package dir (internal/handler), so go up to module root
 	samplesDir := filepath.Join("..", "..", "samples", "audio")

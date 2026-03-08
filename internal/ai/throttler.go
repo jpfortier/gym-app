@@ -3,23 +3,14 @@ package ai
 import (
 	"context"
 	"fmt"
-	"os"
-	"strconv"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/time/rate"
-)
 
-func envInt(key string, def int) int {
-	if s := os.Getenv(key); s != "" {
-		if n, err := strconv.Atoi(s); err == nil && n > 0 {
-			return n
-		}
-	}
-	return def
-}
+	"github.com/jpfortier/gym-app/internal/env"
+)
 
 // Throttler enforces per-user rate limits for AI API calls.
 type Throttler struct {
@@ -40,9 +31,9 @@ type userLimit struct {
 
 func NewThrottlerFromEnv() *Throttler {
 	return NewThrottler(
-		envInt("OPENAI_RATE_PER_MINUTE", 10),
-		envInt("OPENAI_DAILY_LIMIT", 100),
-		envInt("OPENAI_DALLE_DAILY_LIMIT", 5),
+		env.OpenAIRatePerMinute(),
+		env.OpenAIDailyLimit(),
+		env.OpenAIDalleDailyLimit(),
 	)
 }
 

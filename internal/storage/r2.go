@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -13,6 +12,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
+
+	"github.com/jpfortier/gym-app/internal/env"
 )
 
 type R2 struct {
@@ -21,10 +22,10 @@ type R2 struct {
 }
 
 func NewR2() (*R2, error) {
-	accountID := os.Getenv("R2_ACCOUNT_ID")
-	accessKey := os.Getenv("R2_ACCESS_KEY_ID")
-	secretKey := os.Getenv("R2_SECRET_ACCESS_KEY")
-	bucket := os.Getenv("R2_BUCKET")
+	accountID := env.R2AccountID()
+	accessKey := env.R2AccessKeyID()
+	secretKey := env.R2SecretAccessKey()
+	bucket := env.R2Bucket()
 	if bucket == "" {
 		bucket = "gym-app"
 	}

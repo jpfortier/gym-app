@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/jpfortier/gym-app/internal/ai"
+	"github.com/jpfortier/gym-app/internal/chatmessages"
 	"github.com/jpfortier/gym-app/internal/correction"
 	"github.com/jpfortier/gym-app/internal/exercise"
 	"github.com/jpfortier/gym-app/internal/logentry"
@@ -62,9 +63,10 @@ type Service struct {
 	querySvc      *query.Service
 	correctionSvc *correction.Service
 	prSvc         *pr.Service
-	prRepo        *pr.Repo
-	notesRepo     *notes.Repo
-	r2            *storage.R2
+	prRepo           *pr.Repo
+	notesRepo        *notes.Repo
+	chatMessagesRepo *chatmessages.Repo
+	r2               *storage.R2
 }
 
 func NewService(
@@ -80,22 +82,24 @@ func NewService(
 	prSvc *pr.Service,
 	prRepo *pr.Repo,
 	notesRepo *notes.Repo,
+	chatMessagesRepo *chatmessages.Repo,
 	r2 *storage.R2,
 ) *Service {
 	return &Service{
-		client:        client,
-		parser:        parser,
-		sessionSvc:   sessionSvc,
-		logentrySvc:  logentrySvc,
-		logentryRepo: logentryRepo,
-		exerciseSvc:  exerciseSvc,
-		exerciseRepo: exerciseRepo,
-		querySvc:     querySvc,
-		correctionSvc: correctionSvc,
-		prSvc:        prSvc,
-		prRepo:       prRepo,
-		notesRepo:    notesRepo,
-		r2:           r2,
+		client:           client,
+		parser:           parser,
+		sessionSvc:       sessionSvc,
+		logentrySvc:      logentrySvc,
+		logentryRepo:     logentryRepo,
+		exerciseSvc:      exerciseSvc,
+		exerciseRepo:     exerciseRepo,
+		querySvc:         querySvc,
+		correctionSvc:    correctionSvc,
+		prSvc:            prSvc,
+		prRepo:           prRepo,
+		notesRepo:        notesRepo,
+		chatMessagesRepo: chatMessagesRepo,
+		r2:               r2,
 	}
 }
 
@@ -112,25 +116,107 @@ func (s *Service) Process(ctx context.Context, userID uuid.UUID, text string, au
 	if strings.TrimSpace(text) == "" {
 		return &Response{Intent: "unknown", Message: "No input received."}, nil
 	}
-	intent, err := s.parser.Parse(ctx, userID, text)
+	recent := s.loadRecentMessages(ctx, userID)
+	intent, err := s.parser.Parse(ctx, userID, text, recent)
 	if err != nil {
 		return nil, fmt.Errorf("parse: %w", err)
 	}
+	var resp *Response
+	var handleErr error
 	switch intent.Intent {
 	case "log":
-		return s.handleLog(ctx, userID, intent)
+		resp, handleErr = s.handleLog(ctx, userID, intent)
 	case "query":
-		return s.handleQuery(ctx, userID, intent)
+		resp, handleErr = s.handleQuery(ctx, userID, intent)
 	case "correction":
-		return s.handleCorrection(ctx, userID, intent)
+		resp, handleErr = s.handleCorrection(ctx, userID, intent)
 	case "remove":
-		return s.handleRemove(ctx, userID, intent)
+		resp, handleErr = s.handleRemove(ctx, userID, intent)
 	case "restore":
-		return s.handleRestore(ctx, userID, intent)
+		resp, handleErr = s.handleRestore(ctx, userID, intent)
 	case "note":
-		return s.handleNote(ctx, userID, intent)
+		resp, handleErr = s.handleNote(ctx, userID, intent)
 	default:
-		return &Response{Intent: "unknown", Message: "I didn't understand. Try logging a workout, asking about your history, correcting a previous entry, or removing something."}, nil
+		resp = &Response{Intent: "unknown", Message: "I didn't understand. Try logging a workout, asking about your history, correcting a previous entry, or removing something."}
+	}
+	if handleErr != nil {
+		return nil, handleErr
+	}
+	s.appendMessages(ctx, userID, text, resp, intent)
+	return resp, nil
+}
+
+const contextWindowSize = 6
+
+func (s *Service) loadRecentMessages(ctx context.Context, userID uuid.UUID) []ai.ChatMessage {
+	if s.chatMessagesRepo == nil {
+		return nil
+	}
+	msgs, err := s.chatMessagesRepo.ListRecent(ctx, userID, contextWindowSize)
+	if err != nil {
+		return nil
+	}
+	out := make([]ai.ChatMessage, len(msgs))
+	for i, m := range msgs {
+		out[i] = ai.ChatMessage{Role: m.Role, Content: m.Content}
+	}
+	return out
+}
+
+func (s *Service) appendMessages(ctx context.Context, userID uuid.UUID, userText string, resp *Response, intent *ai.ParsedIntent) {
+	if s.chatMessagesRepo == nil {
+		return
+	}
+	summary := buildAssistantSummary(resp, intent)
+	_ = s.chatMessagesRepo.Append(ctx, userID, "user", userText)
+	_ = s.chatMessagesRepo.Append(ctx, userID, "assistant", summary)
+}
+
+func buildAssistantSummary(r *Response, intent *ai.ParsedIntent) string {
+	switch r.Intent {
+	case "log":
+		if intent != nil && len(intent.Exercises) > 0 {
+			var parts []string
+			for _, ex := range intent.Exercises {
+				name := strings.ToLower(ex.ExerciseName)
+				if ex.VariantName != "" && ex.VariantName != "standard" {
+					name += " " + strings.ToLower(ex.VariantName)
+				}
+				for _, set := range ex.Sets {
+					if set.Weight != nil {
+						parts = append(parts, fmt.Sprintf("%s %.0f×%d", name, *set.Weight, set.Reps))
+					} else {
+						parts = append(parts, fmt.Sprintf("%s %d reps", name, set.Reps))
+					}
+				}
+			}
+			if len(parts) > 0 {
+				return fmt.Sprintf("Logged %s.", strings.Join(parts, ", "))
+			}
+		}
+		if len(r.Entries) > 0 {
+			names := make([]string, len(r.Entries))
+			for i, e := range r.Entries {
+				names[i] = fmt.Sprintf("%s %s", e.ExerciseName, e.VariantName)
+			}
+			return fmt.Sprintf("Logged %s.", strings.Join(names, ", "))
+		}
+		return r.Message
+	case "query":
+		if r.History != nil && r.History.ExerciseName != "" {
+			return fmt.Sprintf("Here's your %s %s history.", r.History.ExerciseName, r.History.VariantName)
+		}
+		return "No history found."
+	case "correction":
+		return "Corrected."
+	case "remove":
+		return "Removed."
+	case "restore":
+		return "Brought back."
+	case "note":
+		return "Noted."
+	default:
+		return r.Message
 	}
 }
 

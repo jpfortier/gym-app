@@ -4,14 +4,15 @@ import (
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+
+	"github.com/jpfortier/gym-app/internal/env"
 )
 
 func TestHealth_ok(t *testing.T) {
-	connStr := os.Getenv("DATABASE_URL")
+	connStr := env.DatabaseURL()
 	if connStr == "" {
 		connStr = "postgres://postgres:gym-dev-2025@localhost:15432/postgres?sslmode=disable"
 	}

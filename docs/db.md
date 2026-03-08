@@ -212,6 +212,16 @@ User notes. Global or scoped to category/variant.
 - `image_url` text — DALL-E generated
 - `created_at` timestamptz
 
+### chat_messages
+Conversation history for context-aware parsing. Enables "and another one for 150", "change that", "remove that".
+- `id` uuid PK
+- `user_id` uuid FK → users (ON DELETE CASCADE)
+- `role` text — 'user' | 'assistant'
+- `content` text — User: raw text. Assistant: short summary of action (e.g. "Logged bench press 140×8.")
+- `created_at` timestamptz
+
+**Retention:** Keep forever. No trimming for now. See `docs/chat-context.md`.
+
 ### ai_usage
 Token tracking for admin dashboard.
 - `id` uuid PK
@@ -230,6 +240,7 @@ Token tracking for admin dashboard.
 - `log_entry_sets(log_entry_id)`
 - `workout_sessions(user_id, date)`
 - `personal_records(user_id, exercise_variant_id, pr_type)`
+- `chat_messages(user_id, created_at DESC)` — for ListRecent
 - `ai_usage(user_id, created_at)`
 
 ## Storage

@@ -36,6 +36,7 @@ migrations/       golang-migrate. Run make migrate-up.
 |------|------|---------|
 | API | `docs/api.md` | Endpoints, auth, errors |
 | DB | `docs/db.md` | Schema, migrations |
+| Chat context | `docs/chat-context.md` | Conversation history, sliding window |
 | AI | `docs/ai-throttling.md` | Rate limits, test safety |
 | Env | `docs/notes.md` | Env vars, local setup |
 | Decisions | `docs/notes.md` | Build order, conventions |

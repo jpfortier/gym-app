@@ -3,7 +3,7 @@ app = "gym-app"
 [build]
 
 [deploy]
-  release_command = "sh -c 'migrate -path /migrations -database \"$DATABASE_URL\" up'"
+  release_command = "sh -c 'migrate -path /migrations -database \"${GYM_DATABASE_URL:-$DATABASE_URL}\" up'"
 
 [env]
   PRIMARY_REGION = "dfw"

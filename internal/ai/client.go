@@ -5,11 +5,12 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/sashabaranov/go-openai"
+
+	"github.com/jpfortier/gym-app/internal/env"
 )
 
 type Client struct {
@@ -25,8 +26,8 @@ type ChatMessage struct {
 }
 
 func NewClient(throttle *Throttler, usage UsageRecorder) *Client {
-	key := os.Getenv("OPENAI_API_KEY")
-	testMode := strings.ToLower(os.Getenv("OPENAI_TEST_MODE")) == "true" || key == ""
+	key := env.OpenAIAPIKey()
+	testMode := env.OpenAITestMode() || key == ""
 	var client *openai.Client
 	if !testMode {
 		client = openai.NewClient(key)

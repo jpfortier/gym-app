@@ -14,6 +14,7 @@ import (
 	"github.com/jpfortier/gym-app/internal/ai"
 	"github.com/jpfortier/gym-app/internal/auth"
 	"github.com/jpfortier/gym-app/internal/chat"
+	"github.com/jpfortier/gym-app/internal/chatmessages"
 	"github.com/jpfortier/gym-app/internal/correction"
 	"github.com/jpfortier/gym-app/internal/exercise"
 	"github.com/jpfortier/gym-app/internal/logentry"
@@ -49,7 +50,7 @@ func TestChat_logIntent(t *testing.T) {
 	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
 	prSvc := pr.NewService(prRepo)
 
-	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, nil)
+	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, nil, nil)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
 	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(Chat(chatSvc))))
@@ -101,7 +102,7 @@ func TestChat_removeIntent(t *testing.T) {
 	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
 	prSvc := pr.NewService(prRepo)
 
-	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, nil)
+	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, nil, nil)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
 	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(Chat(chatSvc))))
@@ -155,5 +156,59 @@ func TestChat_removeIntent(t *testing.T) {
 	}
 	if out["message"] != "Brought back." {
 		t.Errorf("got message %v, want Brought back.", out["message"])
+	}
+}
+
+func TestChat_contextStoresMessages(t *testing.T) {
+	db := dbForTest(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	userRepo := user.NewRepo(db)
+	chatMessagesRepo := chatmessages.NewRepo(db)
+	u := &user.User{GoogleID: "chat-ctx-" + uuid.New().String(), Email: "ctx@test.com", Name: "Ctx"}
+	if err := userRepo.Create(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM chat_messages WHERE user_id = $1", u.ID) })
+	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM log_entries WHERE session_id IN (SELECT id FROM workout_sessions WHERE user_id = $1)", u.ID) })
+	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM workout_sessions WHERE user_id = $1", u.ID) })
+	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+
+	throttle := ai.NewThrottlerFromEnv()
+	aiClient := ai.NewClient(throttle, nil)
+	parser := ai.NewParser(aiClient)
+	sessionRepo := session.NewRepo(db)
+	logentryRepo := logentry.NewRepo(db)
+	exerciseRepo := exercise.NewRepo(db)
+	exerciseSvc := exercise.NewService(exerciseRepo, aiClient)
+	prRepo := pr.NewRepo(db)
+	sessionSvc := session.NewService(sessionRepo)
+	logentrySvc := logentry.NewService(logentryRepo, sessionSvc)
+	querySvc := query.NewService(exerciseRepo, logentryRepo, sessionRepo)
+	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
+	prSvc := pr.NewService(prRepo)
+
+	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, chatMessagesRepo, nil)
+	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
+	mux := http.NewServeMux()
+	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(Chat(chatSvc))))
+
+	body, _ := json.Marshal(map[string]string{"text": "bench press 135 for 8"})
+	req := httptest.NewRequest(http.MethodPost, "/chat", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer x")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var count int
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM chat_messages WHERE user_id = $1", u.ID).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Errorf("got %d chat_messages, want 2 (user + assistant)", count)
 	}
 }

@@ -34,7 +34,7 @@ All log creation goes through POST /chat. No manual write endpoint.
 - **Request:** `{ "text": "..." }` or `{ "audio_base64": "..." }` (optional `audio_format`, e.g. `"m4a"`)
 - **Response:** Varies by intent (log, query, correction, remove, note). Server infers via LLM.
 - **Auth:** `Authorization: Bearer <google_id_token>`
-- **Throttling:** Per-user rate limits. See `docs/ai-throttling.md`. Set `OPENAI_TEST_MODE=true` for tests.
+- **Throttling:** Per-user rate limits. See `docs/ai-throttling.md`. Set `GYM_OPENAI_TEST_MODE=true` for tests.
 
 **Exercise resolution (log intent):** Resolves exercise names (e.g. "RDL") to category/variant. Order: exact match → user alias lookup → embedding similarity → create new. When we resolve via embedding or create, we store the alias so future lookups skip the LLM.
 
@@ -45,6 +45,8 @@ All log creation goes through POST /chat. No manual write endpoint.
 **Note intent:** User says "remember for RDLs: warm up hamstrings", "note for deadlift: brace core", "reminder: stretch before squats". AI infers note intent from phrases like "remember", "note for", "reminder". Notes are stored per user, optionally scoped to a category or variant. Global notes (no exercise) and variant-specific notes supported.
 
 **AI usage:** Token usage (prompt/completion) for Chat, Transcribe, Embed, and DALL-E is persisted to `ai_usage` per user. Used for cost tracking and admin dashboards.
+
+**Context:** Conversation history stored in `chat_messages`. Last 6 messages passed to parser. Enables follow-ups like "and another one for 150", "change that to 6 reps". See `docs/chat-context.md`.
 
 ## GET /prs/{id}/image
 
