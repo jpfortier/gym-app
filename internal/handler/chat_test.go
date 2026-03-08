@@ -36,7 +36,7 @@ func TestChat_logIntent(t *testing.T) {
 	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	throttle := ai.NewThrottlerFromEnv()
-	aiClient := ai.NewClient(throttle)
+	aiClient := ai.NewClient(throttle, nil)
 	parser := ai.NewParser(aiClient)
 	sessionRepo := session.NewRepo(db)
 	logentryRepo := logentry.NewRepo(db)
@@ -49,7 +49,7 @@ func TestChat_logIntent(t *testing.T) {
 	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
 	prSvc := pr.NewService(prRepo)
 
-	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil)
+	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, nil)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
 	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(Chat(chatSvc))))
@@ -88,7 +88,7 @@ func TestChat_removeIntent(t *testing.T) {
 	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	throttle := ai.NewThrottlerFromEnv()
-	aiClient := ai.NewClient(throttle)
+	aiClient := ai.NewClient(throttle, nil)
 	parser := ai.NewParser(aiClient)
 	sessionRepo := session.NewRepo(db)
 	logentryRepo := logentry.NewRepo(db)
@@ -101,7 +101,7 @@ func TestChat_removeIntent(t *testing.T) {
 	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
 	prSvc := pr.NewService(prRepo)
 
-	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil)
+	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, nil)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
 	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(Chat(chatSvc))))

@@ -16,7 +16,9 @@
 - **Exercise resolution:** Exact match → user alias lookup → embedding similarity → create new. Aliases learned when we resolve via embedding or create (e.g. "RDL" → Deadlift/RDL); future lookups skip the LLM.
 - **Corrections:** Via chat, not a separate PATCH endpoint. "Change my bench yesterday from 140 to 150" → LLM infers correction.
 - **Remove/undo:** Via chat. "Forget that", "remove the last bench", "scratch that" → soft-delete (disabled_at) the matching entry. "Bring that back", "oh sorry bring it back" → restore (undo the remove).
-- **Intent:** Client never chooses. Single POST /chat; LLM infers log vs query vs correction.
+- **Intent:** Client never chooses. Single POST /chat; LLM infers log vs query vs correction vs note.
+- **Note intent:** Phrases like "remember for RDLs: warm up hamstrings", "note for deadlift: brace core" infer note intent. Notes stored in `notes` table, scoped to user and optionally category/variant. Discussion point for AI to surface relevant notes when user logs that exercise.
+- **AI usage:** Token usage persisted to `ai_usage` per user for Chat, Transcribe, Embed, DALL-E. Cost tracking and admin dashboards.
 - **Log structure:** Block + sets (log_entries + log_entry_sets). Supports ramp/pyramid.
 - **raw_speech:** Store the exact text the user said for each exercise block (per-exercise segment, not full paragraph). Enables reprocessing if parsing improves.
 - **Partial logging:** User may say only the peak ("squats 195×1") or all sets. LLM parses what they say; we store exactly that. No inferring warm-up sets.

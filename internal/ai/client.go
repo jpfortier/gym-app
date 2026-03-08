@@ -15,6 +15,7 @@ import (
 type Client struct {
 	client   *openai.Client
 	throttle *Throttler
+	usage    UsageRecorder
 	testMode bool
 }
 
@@ -23,14 +24,14 @@ type ChatMessage struct {
 	Content string
 }
 
-func NewClient(throttle *Throttler) *Client {
+func NewClient(throttle *Throttler, usage UsageRecorder) *Client {
 	key := os.Getenv("OPENAI_API_KEY")
 	testMode := strings.ToLower(os.Getenv("OPENAI_TEST_MODE")) == "true" || key == ""
 	var client *openai.Client
 	if !testMode {
 		client = openai.NewClient(key)
 	}
-	return &Client{client: client, throttle: throttle, testMode: testMode}
+	return &Client{client: client, throttle: throttle, usage: usage, testMode: testMode}
 }
 
 // Transcribe decodes base64 audio and returns text. Throttled.
@@ -58,6 +59,10 @@ func (c *Client) Transcribe(ctx context.Context, userID uuid.UUID, audioBase64 s
 	if err != nil {
 		return "", fmt.Errorf("whisper: %w", err)
 	}
+	if c.usage != nil && resp.Duration > 0 {
+		cost := CostCentsWhisper(resp.Duration)
+		c.usage.Record(ctx, &userID, "whisper-1", 0, 0, cost)
+	}
 	return resp.Text, nil
 }
 
@@ -82,6 +87,10 @@ func (c *Client) Chat(ctx context.Context, userID uuid.UUID, messages []ChatMess
 	}
 	if len(resp.Choices) == 0 {
 		return "", fmt.Errorf("no completion")
+	}
+	if c.usage != nil {
+		cost := CostCents("gpt-4o", resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
+		c.usage.Record(ctx, &userID, "gpt-4o", resp.Usage.PromptTokens, resp.Usage.CompletionTokens, cost)
 	}
 	return strings.TrimSpace(resp.Choices[0].Message.Content), nil
 }

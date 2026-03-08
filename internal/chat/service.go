@@ -13,6 +13,7 @@ import (
 	"github.com/jpfortier/gym-app/internal/correction"
 	"github.com/jpfortier/gym-app/internal/exercise"
 	"github.com/jpfortier/gym-app/internal/logentry"
+	"github.com/jpfortier/gym-app/internal/notes"
 	"github.com/jpfortier/gym-app/internal/pr"
 	"github.com/jpfortier/gym-app/internal/query"
 	"github.com/jpfortier/gym-app/internal/session"
@@ -62,6 +63,7 @@ type Service struct {
 	correctionSvc *correction.Service
 	prSvc         *pr.Service
 	prRepo        *pr.Repo
+	notesRepo     *notes.Repo
 	r2            *storage.R2
 }
 
@@ -77,6 +79,7 @@ func NewService(
 	correctionSvc *correction.Service,
 	prSvc *pr.Service,
 	prRepo *pr.Repo,
+	notesRepo *notes.Repo,
 	r2 *storage.R2,
 ) *Service {
 	return &Service{
@@ -91,6 +94,7 @@ func NewService(
 		correctionSvc: correctionSvc,
 		prSvc:        prSvc,
 		prRepo:       prRepo,
+		notesRepo:    notesRepo,
 		r2:           r2,
 	}
 }
@@ -123,6 +127,8 @@ func (s *Service) Process(ctx context.Context, userID uuid.UUID, text string, au
 		return s.handleRemove(ctx, userID, intent)
 	case "restore":
 		return s.handleRestore(ctx, userID, intent)
+	case "note":
+		return s.handleNote(ctx, userID, intent)
 	default:
 		return &Response{Intent: "unknown", Message: "I didn't understand. Try logging a workout, asking about your history, correcting a previous entry, or removing something."}, nil
 	}
@@ -272,6 +278,33 @@ func (s *Service) handleRestore(ctx context.Context, userID uuid.UUID, intent *a
 		return &Response{Intent: "restore", Message: "Couldn't restore that entry."}, nil
 	}
 	return &Response{Intent: "restore", Message: "Brought back."}, nil
+}
+
+func (s *Service) handleNote(ctx context.Context, userID uuid.UUID, intent *ai.ParsedIntent) (*Response, error) {
+	content := strings.TrimSpace(intent.NoteContent)
+	if content == "" {
+		return &Response{Intent: "note", Message: "What should I remember?"}, nil
+	}
+	var categoryID, variantID *uuid.UUID
+	if intent.Category != "" && intent.Variant != "" {
+		v, err := s.exerciseRepo.Resolve(ctx, userID, intent.Category, intent.Variant)
+		if err != nil || v == nil {
+			v, err = s.exerciseSvc.ResolveOrCreate(ctx, userID, intent.Category, intent.Variant)
+			if err != nil || v == nil {
+				return &Response{Intent: "note", Message: "Couldn't find that exercise."}, nil
+			}
+		}
+		cat, _ := s.exerciseRepo.GetCategoryByID(ctx, v.CategoryID)
+		if cat != nil {
+			categoryID = &cat.ID
+		}
+		variantID = &v.ID // variant-scoped note
+	}
+	_, err := s.notesRepo.Create(ctx, userID, categoryID, variantID, content)
+	if err != nil {
+		return nil, err
+	}
+	return &Response{Intent: "note", Message: "Noted."}, nil
 }
 
 func (s *Service) handleCorrection(ctx context.Context, userID uuid.UUID, intent *ai.ParsedIntent) (*Response, error) {

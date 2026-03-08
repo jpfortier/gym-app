@@ -12,7 +12,7 @@ import (
 
 // ParsedIntent is the structured output from the LLM.
 type ParsedIntent struct {
-	Intent string `json:"intent"` // "log" | "query" | "correction" | "remove" | "restore" | "unknown"
+	Intent string `json:"intent"` // "log" | "query" | "correction" | "remove" | "restore" | "note" | "unknown"
 	// Log
 	Date      string          `json:"date,omitempty"`      // YYYY-MM-DD
 	Exercises []ParsedExercise `json:"exercises,omitempty"`
@@ -21,6 +21,8 @@ type ParsedIntent struct {
 	Variant   string            `json:"variant,omitempty"`
 	TargetRef string            `json:"target_ref,omitempty"` // for correction: "last bench"; for remove: "last", "that"
 	Changes   *ParsedCorrection `json:"changes,omitempty"`
+	// Note
+	NoteContent string `json:"note_content,omitempty"`
 }
 
 type ParsedExercise struct {
@@ -55,6 +57,9 @@ Output format (one of):
   If user says "forget that" or "remove it" without naming exercise, omit category/variant (we remove most recent entry). Otherwise use category and variant. target_ref: "last" or "that".
 - Restore: {"intent":"restore"}
   User wants to bring back a recently removed entry. Phrases: "bring that back", "oh sorry bring it back", "restore that", "undo that" (after having removed something).
+- Note: {"intent":"note","category":"deadlift","variant":"rdl","content":"warm up hamstrings first"}
+  User wants to add a reusable reminder for an exercise. Phrases: "remember for RDLs: warm up hamstrings", "add a note for deadlift: use straps when heavy", "note for bench: retract scapula".
+  category and variant identify the exercise (omit for global note). content is the reminder text.
 - Unclear: {"intent":"unknown"}
 
 Rules:
@@ -92,6 +97,9 @@ func (p *parserImpl) parseMock(text string) (*ParsedIntent, error) {
 	}
 	if strings.Contains(text, "change") || strings.Contains(text, "correct") || strings.Contains(text, "wrong") {
 		return &ParsedIntent{Intent: "correction", TargetRef: "last", Changes: &ParsedCorrection{Weight: ptrFloat(150)}}, nil
+	}
+	if strings.Contains(text, "remember") || (strings.Contains(text, "note") && strings.Contains(text, "for")) {
+		return &ParsedIntent{Intent: "note", Category: "deadlift", Variant: "rdl", NoteContent: "warm up hamstrings first"}, nil
 	}
 	if (strings.Contains(text, "bring") && strings.Contains(text, "back")) || strings.Contains(text, "restore") ||
 		(strings.Contains(text, "sorry") && strings.Contains(text, "back")) {

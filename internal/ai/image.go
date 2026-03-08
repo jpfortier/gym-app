@@ -41,5 +41,9 @@ func (c *Client) GeneratePRImage(ctx context.Context, userID uuid.UUID, exercise
 	if len(resp.Data) == 0 {
 		return nil, fmt.Errorf("no image returned")
 	}
+	if c.usage != nil {
+		cost := CostCents("dall-e-3", 0, 0)
+		c.usage.Record(ctx, &userID, "dall-e-3", 0, 0, cost)
+	}
 	return base64.StdEncoding.DecodeString(resp.Data[0].B64JSON)
 }

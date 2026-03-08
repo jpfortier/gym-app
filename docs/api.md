@@ -32,7 +32,7 @@ All log creation goes through POST /chat. No manual write endpoint.
 ## POST /chat
 
 - **Request:** `{ "text": "..." }` or `{ "audio_base64": "..." }` (optional `audio_format`, e.g. `"m4a"`)
-- **Response:** Varies by intent (log, query, correction, remove). Server infers via LLM.
+- **Response:** Varies by intent (log, query, correction, remove, note). Server infers via LLM.
 - **Auth:** `Authorization: Bearer <google_id_token>`
 - **Throttling:** Per-user rate limits. See `docs/ai-throttling.md`. Set `OPENAI_TEST_MODE=true` for tests.
 
@@ -41,6 +41,10 @@ All log creation goes through POST /chat. No manual write endpoint.
 **Remove intent:** User says "forget that", "remove it", "delete the last bench", "scratch that". Soft-deletes (disables) the matching log entry. If no exercise specified, removes the most recent entry for today.
 
 **Restore intent:** User says "bring that back", "oh sorry bring it back", "restore that" after having removed something. Restores the most recently disabled entry for today.
+
+**Note intent:** User says "remember for RDLs: warm up hamstrings", "note for deadlift: brace core", "reminder: stretch before squats". AI infers note intent from phrases like "remember", "note for", "reminder". Notes are stored per user, optionally scoped to a category or variant. Global notes (no exercise) and variant-specific notes supported.
+
+**AI usage:** Token usage (prompt/completion) for Chat, Transcribe, Embed, and DALL-E is persisted to `ai_usage` per user. Used for cost tracking and admin dashboards.
 
 ## GET /prs/{id}/image
 

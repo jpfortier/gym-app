@@ -47,7 +47,7 @@ func TestChat_audioSamples(t *testing.T) {
 	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	throttle := ai.NewThrottlerFromEnv()
-	aiClient := ai.NewClient(throttle)
+	aiClient := ai.NewClient(throttle, nil)
 	parser := ai.NewParser(aiClient)
 	sessionRepo := session.NewRepo(db)
 	logentryRepo := logentry.NewRepo(db)
@@ -60,7 +60,7 @@ func TestChat_audioSamples(t *testing.T) {
 	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
 	prSvc := pr.NewService(prRepo)
 
-	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil)
+	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, nil)
 
 	// Resolve samples path: go test runs from package dir (internal/handler), so go up to module root
 	samplesDir := filepath.Join("..", "..", "samples", "audio")

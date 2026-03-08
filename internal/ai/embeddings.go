@@ -29,5 +29,10 @@ func (c *Client) Embed(ctx context.Context, userID uuid.UUID, text string) ([]fl
 	if len(resp.Data) == 0 {
 		return nil, fmt.Errorf("no embedding returned")
 	}
+	if c.usage != nil {
+		prompt, completion := resp.Usage.PromptTokens, resp.Usage.CompletionTokens
+		cost := CostCents("text-embedding-3-small", prompt, completion)
+		c.usage.Record(ctx, &userID, "text-embedding-3-small", prompt, completion, cost)
+	}
 	return resp.Data[0].Embedding, nil
 }
