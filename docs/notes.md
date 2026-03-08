@@ -85,6 +85,11 @@ Reference for DB design and set_type variety:
 - Barbell RDL — 4 × 6 — Heavy Pull / For Weight
 - Heel Elevated Back Squats — 8, 6, 4, MAX — PUMP / For Weight
 
+## Repo structure
+
+- **gym-app** — Backend (Go, API, migrations). https://github.com/jpfortier/gym-app
+- **gym-app-android** — Android app. https://github.com/jpfortier/gym-app-android
+
 ## Context
 
 - Dev workflow: one thing at a time, scratchpad for tracking
