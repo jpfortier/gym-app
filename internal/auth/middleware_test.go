@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -26,8 +27,16 @@ func TestRequireAuth_missingAuthorization(t *testing.T) {
 	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("got status %d, want 401", rec.Code)
 	}
-	if rec.Body.String() != `{"error":"missing authorization"}`+"\n" {
-		t.Errorf("got body %q", rec.Body.String())
+	var errBody struct {
+		Error     string `json:"error"`
+		Code      string `json:"code"`
+		ErrorToken string `json:"error_token"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&errBody); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if errBody.Error != "missing authorization" || errBody.Code != "missing_auth" || errBody.ErrorToken == "" {
+		t.Errorf("got error=%q code=%q error_token=%q", errBody.Error, errBody.Code, errBody.ErrorToken)
 	}
 	if verifier.verifyCalled {
 		t.Error("verifier should not be called when token is missing")
@@ -69,8 +78,16 @@ func TestRequireAuth_invalidToken(t *testing.T) {
 	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("got status %d, want 401", rec.Code)
 	}
-	if rec.Body.String() != `{"error":"invalid token"}`+"\n" {
-		t.Errorf("got body %q", rec.Body.String())
+	var errBody struct {
+		Error     string `json:"error"`
+		Code      string `json:"code"`
+		ErrorToken string `json:"error_token"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&errBody); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if errBody.Error != "invalid token" || errBody.Code != "invalid_token" || errBody.ErrorToken == "" {
+		t.Errorf("got error=%q code=%q error_token=%q", errBody.Error, errBody.Code, errBody.ErrorToken)
 	}
 }
 
