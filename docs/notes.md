@@ -55,6 +55,8 @@ Build segment by segment. Each segment gets a test before moving on.
 
 Migrations run automatically before each deploy via `release_command`. Requires `GYM_DATABASE_URL` or `DATABASE_URL` (Fly postgres attach sets `DATABASE_URL`). Set with `fly postgres attach gym-app-pg --app gym-app` or `fly secrets set GYM_DATABASE_URL="postgres://..." -a gym-app`.
 
+**Deploy to Fly:** See `docs/deploy-fly.md` for secrets, env vars, and deployment steps.
+
 ## Local DB setup
 
 1. Start proxy: `fly proxy 15432:5432 -a gym-app-pg`
@@ -67,7 +69,7 @@ Migrations run automatically before each deploy via `release_command`. Requires 
 
 **GYM_ prefix:** All gym env vars use `GYM_` prefix (e.g. `GYM_DATABASE_URL`) to avoid collisions with other projects. If you have `DATABASE_URL` set in your shell for worklist or another project, gym will use `GYM_DATABASE_URL` from `.env` instead.
 
-**Reset password** (if needed): `printf 'ALTER USER postgres PASSWORD '\''newpass'\'';\n\\q\n' | fly postgres connect -a gym-app-pg`
+**Reset password** (if needed): `printf 'ALTER USER postgres PASSWORD '\''newpass'\'';\n\\q\n' | fly postgres connect -a gym-app-pg`. If that fails with "password authentication failed", use SSH + unix socket: `fly ssh console -a gym-app-pg -C "su postgres -c \"psql -h /var/run/postgresql -p 5433 -d postgres -c \\\"ALTER USER postgres PASSWORD 'newpass';\\\"\""` (postgres-flex uses port 5433 for the socket).
 
 ## Env vars
 

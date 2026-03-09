@@ -23,7 +23,7 @@ func NewHandler(client *ai.Client) *Handler {
 // For set_name (initial): may twist the name or substitute if rude.
 // For update_name (rename): uses rawName as-is.
 func (h *Handler) Process(ctx context.Context, userID uuid.UUID, rawName string, isRename bool) (storedName string, responseMessage string, err error) {
-	rawName = strings.TrimSpace(rawName)
+	rawName = strings.TrimRight(strings.TrimSpace(rawName), ".,!?")
 	if rawName == "" {
 		return "", "What should I call you?", nil
 	}

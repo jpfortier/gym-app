@@ -96,6 +96,17 @@ Segments 1–6 done: Session repo+service, Log entry repo+service, Exercise repo
 
 - `internal/auth/verify.go` — VerifyGoogleToken using google.golang.org/api/idtoken
 - `internal/auth/middleware.go` — RequireAuth middleware, get-or-create user, UserFromContext
-- `internal/user/` — User struct, Repo (GetByGoogleID, Create)
+- `internal/user/` — User struct, Repo (GetByGoogleID, Create, GetByEmail)
 - `GET /me` — protected endpoint returning current user (for testing auth)
 - Env: GOOGLE_CLIENT_ID (OAuth2 client ID), DATABASE_URL
+
+## Dev token (completed)
+
+- `GYM_DEV_MODE=true` — Enables GET /dev/token and Bearer dev:\<email\> auth
+- `GET /dev/token` — Returns `{ "token": "dev:<email>" }` (default test@datavysta.com; override with ?email=)
+- Bearer dev:\<email\> — Middleware accepts; user looked up by email, created if missing (google_id = "dev-" + email)
+- Documented in docs/api.md, .env.example
+
+## Lessons
+
+- **Fly Postgres password reset (postgres-flex):** When `fly postgres connect` fails with "password authentication failed", the postgres user password is out of sync with OPERATOR_PASSWORD/SU_PASSWORD. To reset: SSH in and use unix socket (peer auth). The socket is at `/var/run/postgresql/.s.PGSQL.5433` (port 5433, not 5432). Run: `fly ssh console -a gym-app-pg -C "su postgres -c \"psql -h /var/run/postgresql -p 5433 -d postgres -c \\\"ALTER USER postgres PASSWORD 'gym-dev-2025';\\\"\""` Then update .env to use that password. The docs' suggested `gym-dev-2025` only works after you've run this reset.

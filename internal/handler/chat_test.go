@@ -308,4 +308,62 @@ func TestChat_setName(t *testing.T) {
 	}
 }
 
+// TestChat_logAndQuerySamplesFromAudio exercises log/query samples from samples/audio/README.md.
+func TestChat_logAndQuerySamplesFromAudio(t *testing.T) {
+	cases := []struct {
+		label       string
+		text        string
+		wantIntent  string
+		description string
+	}{
+		{"Close Grip Bench Press", "Close Grip Bench Press, 130.", "log", "single exercise, close grip variant"},
+		{"query close grip bench", "What's my last close grip bench press?", "query", "query by variant"},
+		{"RDL and shoulder press", "RDL 3 sets of 8 at 300 lbs and shoulder press 4 sets of 8 at 100 lbs.", "log", "multi-exercise log"},
+		{"query deadlift", "What's my last deadlift?", "query", "query deadlift"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.label, func(t *testing.T) {
+			db := dbForTest(t)
+			defer db.Close()
+			ctx := context.Background()
+
+			userRepo := user.NewRepo(db)
+			u := &user.User{GoogleID: "samples-" + uuid.New().String(), Email: "samples@test.com", Name: "S"}
+			if err := userRepo.Create(ctx, u); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				_, _ = db.ExecContext(ctx, "DELETE FROM log_entry_sets WHERE log_entry_id IN (SELECT id FROM log_entries WHERE session_id IN (SELECT id FROM workout_sessions WHERE user_id = $1))", u.ID)
+				_, _ = db.ExecContext(ctx, "DELETE FROM log_entries WHERE session_id IN (SELECT id FROM workout_sessions WHERE user_id = $1)", u.ID)
+				_, _ = db.ExecContext(ctx, "DELETE FROM workout_sessions WHERE user_id = $1", u.ID)
+				_, _ = db.ExecContext(ctx, "DELETE FROM chat_messages WHERE user_id = $1", u.ID)
+				_, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID)
+			})
+
+			mux := chatTestServer(t, db, u, nil)
+
+			body, _ := json.Marshal(map[string]string{"text": tc.text})
+			req := httptest.NewRequest(http.MethodPost, "/chat", bytes.NewReader(body))
+			req.Header.Set("Authorization", "Bearer x")
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("got status %d: %s", rec.Code, rec.Body.String())
+			}
+			var out map[string]interface{}
+			if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
+				t.Fatal(err)
+			}
+			gotIntent, _ := out["intent"].(string)
+			if gotIntent != tc.wantIntent {
+				t.Errorf("got intent %v, want %s", gotIntent, tc.wantIntent)
+			}
+			msg, _ := out["message"].(string)
+			t.Logf("text=%q → intent=%s message=%q (%s)", tc.text, gotIntent, msg, tc.description)
+		})
+	}
+}
+
 func ptrFloat(f float64) *float64 { return &f }
