@@ -28,7 +28,7 @@ func TestService_History_returnsEntries(t *testing.T) {
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	exerciseRepo := exercise.NewRepo(db)
 	variant, err := exerciseRepo.Resolve(ctx, u.ID, "deadlift", "standard")
@@ -85,7 +85,7 @@ func TestService_History_notFoundReturnsNil(t *testing.T) {
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	exerciseRepo := exercise.NewRepo(db)
 	logentryRepo := logentry.NewRepo(db)

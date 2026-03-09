@@ -42,6 +42,6 @@ func ExercisesList(exerciseRepo *exercise.Repo) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(out)
+		_ = json.NewEncoder(w).Encode(out)
 	}
 }

@@ -18,7 +18,7 @@ func TestService_CreateLogEntry(t *testing.T) {
 	ctx := context.Background()
 
 	u := createLogEntryTestUser(t, db, ctx)
-	defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID)
+	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) }()
 
 	var variantID uuid.UUID
 	if err := db.QueryRowContext(ctx, `SELECT id FROM exercise_variants WHERE user_id IS NULL LIMIT 1`).Scan(&variantID); err != nil {
@@ -59,7 +59,7 @@ func TestService_CreateLogEntry_sameDayReusesSession(t *testing.T) {
 	ctx := context.Background()
 
 	u := createLogEntryTestUser(t, db, ctx)
-	defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID)
+	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) }()
 
 	var variantID uuid.UUID
 	if err := db.QueryRowContext(ctx, `SELECT id FROM exercise_variants WHERE user_id IS NULL LIMIT 1`).Scan(&variantID); err != nil {
@@ -91,7 +91,7 @@ func TestService_CreateLogEntry_sessionAndLogEntryIntegration(t *testing.T) {
 	ctx := context.Background()
 
 	u := createLogEntryTestUser(t, db, ctx)
-	defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID)
+	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) }()
 
 	var variantID uuid.UUID
 	if err := db.QueryRowContext(ctx, `SELECT id FROM exercise_variants WHERE user_id IS NULL LIMIT 1`).Scan(&variantID); err != nil {

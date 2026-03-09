@@ -24,7 +24,7 @@ func (r *Repo) Create(ctx context.Context, entry *LogEntry, sets []SetInput) err
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	err = tx.QueryRowContext(ctx,
 		`INSERT INTO log_entries (id, session_id, exercise_variant_id, raw_speech, notes)

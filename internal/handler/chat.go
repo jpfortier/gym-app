@@ -34,6 +34,6 @@ func Chat(chatSvc *chat.Service) http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}
 }

@@ -35,9 +35,9 @@ func TestChat_audioSamples(t *testing.T) {
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM log_entries WHERE user_id = $1", u.ID) })
-	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM workout_sessions WHERE user_id = $1", u.ID) })
-	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM log_entries WHERE user_id = $1", u.ID) })
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM workout_sessions WHERE user_id = $1", u.ID) })
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	chatSvc := chatTestService(t, db, nil, nil)
 

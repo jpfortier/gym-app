@@ -23,7 +23,7 @@ func seedSessionAndVariant(t *testing.T, db *sql.DB, ctx context.Context) (sessI
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	sessionRepo := session.NewRepo(db)
 	parsed, _ := time.Parse("2006-01-02", "2025-03-12")

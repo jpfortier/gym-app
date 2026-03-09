@@ -1,4 +1,7 @@
-.PHONY: migrate-up migrate-down migrate-create verify-openai test
+.PHONY: migrate-up migrate-down migrate-create verify-openai test lint
+
+lint:
+	$(shell go env GOPATH)/bin/golangci-lint run
 
 # Run migrations. Start proxy: fly proxy 15432:5432 -a gym-app-pg
 # Requires pgvector: enable in Fly dashboard (PostgreSQL Extensions) for migration 000008.

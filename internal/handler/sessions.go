@@ -44,7 +44,7 @@ func SessionsList(sessionRepo *session.Repo) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(out)
+		_ = json.NewEncoder(w).Encode(out)
 	}
 }
 
@@ -123,6 +123,6 @@ func SessionDetail(sessionRepo *session.Repo, logentryRepo *logentry.Repo, exerc
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(out)
+		_ = json.NewEncoder(w).Encode(out)
 	}
 }

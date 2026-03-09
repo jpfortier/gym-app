@@ -26,7 +26,7 @@ func TestPRsList_returnsUserPRs(t *testing.T) {
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	var variantID uuid.UUID
 	if err := db.QueryRowContext(ctx, `SELECT id FROM exercise_variants WHERE user_id IS NULL LIMIT 1`).Scan(&variantID); err != nil {
@@ -39,7 +39,7 @@ func TestPRsList_returnsUserPRs(t *testing.T) {
 	if err := prRepo.Create(ctx, prRec); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM personal_records WHERE id = $1", prRec.ID) })
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM personal_records WHERE id = $1", prRec.ID) })
 
 	exerciseRepo := exercise.NewRepo(db)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}

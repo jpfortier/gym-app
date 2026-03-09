@@ -47,7 +47,7 @@ func QueryHistory(queryService *query.Service, exerciseRepo *exercise.Repo) http
 		}
 		if variantOut == nil {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]any{"entries": []any{}, "exercise_name": "", "variant_name": ""})
+			_ = json.NewEncoder(w).Encode(map[string]any{"entries": []any{}, "exercise_name": "", "variant_name": ""})
 			return
 		}
 
@@ -77,6 +77,6 @@ func QueryHistory(queryService *query.Service, exerciseRepo *exercise.Repo) http
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(out)
+		_ = json.NewEncoder(w).Encode(out)
 	}
 }

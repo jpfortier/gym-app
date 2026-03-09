@@ -24,7 +24,7 @@ func TestRepo_Resolve_seededGlobal(t *testing.T) {
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	repo := NewRepo(db)
 	v, err := repo.Resolve(ctx, u.ID, "bench press", "standard")
@@ -45,7 +45,7 @@ func TestRepo_Resolve_caseInsensitive(t *testing.T) {
 	ctx := context.Background()
 
 	u := createExerciseTestUser(t, db, ctx)
-	defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID)
+	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) }()
 
 	repo := NewRepo(db)
 	v, err := repo.Resolve(ctx, u.ID, "DEADLIFT", "STANDARD")
@@ -63,7 +63,7 @@ func TestRepo_Resolve_notFound(t *testing.T) {
 	ctx := context.Background()
 
 	u := createExerciseTestUser(t, db, ctx)
-	defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID)
+	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) }()
 
 	repo := NewRepo(db)
 	v, err := repo.Resolve(ctx, u.ID, "nonexistent exercise", "standard")
@@ -81,7 +81,7 @@ func TestRepo_CreateCategory_CreateVariant_Resolve(t *testing.T) {
 	ctx := context.Background()
 
 	u := createExerciseTestUser(t, db, ctx)
-	defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID)
+	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) }()
 
 	repo := NewRepo(db)
 	cat := &Category{UserID: &u.ID, Name: "hula hoop", ShowWeight: true, ShowReps: true}
@@ -108,8 +108,8 @@ func TestRepo_StoreAlias_FindVariantByAlias(t *testing.T) {
 	ctx := context.Background()
 
 	u := createExerciseTestUser(t, db, ctx)
-	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM user_exercise_aliases WHERE user_id = $1", u.ID) })
-	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM user_exercise_aliases WHERE user_id = $1", u.ID) })
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	repo := NewRepo(db)
 	cat := &Category{UserID: &u.ID, Name: "Deadlift", ShowWeight: true, ShowReps: true}

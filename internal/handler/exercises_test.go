@@ -26,7 +26,7 @@ func TestExercisesList_returnsCategoriesAndVariants(t *testing.T) {
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	exerciseRepo := exercise.NewRepo(db)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}

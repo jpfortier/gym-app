@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -58,8 +59,7 @@ func NewServer(ctx context.Context) (*Server, error) {
 	parser := ai.NewParser(aiClient)
 	r2, err := storage.NewR2()
 	if err != nil {
-		log.Printf("R2 init failed (PR images disabled): %v", err)
-		r2 = nil
+		return nil, fmt.Errorf("R2 init: %w", err)
 	}
 	chatSvc := chat.NewService(chat.Config{
 		Client:           aiClient,

@@ -107,7 +107,7 @@ func TestRequireAuth_validToken_existingUser(t *testing.T) {
 	handler := RequireAuth(verifier, store, "test-client-id")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedUser = UserFromContext(r.Context())
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/me", nil)
@@ -151,7 +151,7 @@ func TestRequireAuth_validToken_createsNewUser(t *testing.T) {
 	handler := RequireAuth(verifier, store, "test-client-id")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedUser = UserFromContext(r.Context())
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/me", nil)

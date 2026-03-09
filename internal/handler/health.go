@@ -11,9 +11,9 @@ func Health(db *sql.DB) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		if err := db.PingContext(r.Context()); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			json.NewEncoder(w).Encode(map[string]string{"status": "unhealthy", "error": "database"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "unhealthy", "error": "database"})
 			return
 		}
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	}
 }

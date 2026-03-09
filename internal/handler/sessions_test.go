@@ -33,7 +33,7 @@ func TestSessionsList_returnsUserSessions(t *testing.T) {
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	sessionRepo := session.NewRepo(db)
 	parsed, _ := time.Parse("2006-01-02", "2025-03-16")
@@ -72,7 +72,7 @@ func TestSessionDetail_returnsSessionWithEntries(t *testing.T) {
 	ctx := context.Background()
 
 	u := createSessionsTestUser(t, db, ctx)
-	defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID)
+	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) }()
 
 	sessionRepo := session.NewRepo(db)
 	parsed, _ := time.Parse("2006-01-02", "2025-03-17")
@@ -125,7 +125,7 @@ func TestSessionDetail_otherUserReturns404(t *testing.T) {
 
 	u1 := createSessionsTestUser(t, db, ctx)
 	u2 := createSessionsTestUser(t, db, ctx)
-	defer db.ExecContext(ctx, "DELETE FROM users WHERE id IN ($1, $2)", u1.ID, u2.ID)
+	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id IN ($1, $2)", u1.ID, u2.ID) }()
 
 	sessionRepo := session.NewRepo(db)
 	parsed, _ := time.Parse("2006-01-02", "2025-03-18")
