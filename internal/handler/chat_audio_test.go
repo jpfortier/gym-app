@@ -61,7 +61,7 @@ func TestChat_audioSamples(t *testing.T) {
 	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
 	prSvc := pr.NewService(prRepo)
 
-	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, nil, nil)
+	chatSvc := chat.NewService(aiClient, parser, sessionSvc, sessionRepo, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, nil, nil)
 
 	// Resolve samples path: go test runs from package dir (internal/handler), so go up to module root
 	samplesDir := filepath.Join("..", "..", "samples", "audio")

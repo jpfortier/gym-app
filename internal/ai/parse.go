@@ -23,6 +23,20 @@ type ParsedIntent struct {
 	Changes   *ParsedCorrection `json:"changes,omitempty"`
 	// Note
 	NoteContent string `json:"note_content,omitempty"`
+	// Assumption ledger: explicit vs inferred, ambiguities
+	Assumptions []Assumption   `json:"assumptions,omitempty"`
+	Ambiguities []string       `json:"ambiguities,omitempty"`
+	UIText      *ParsedUIText  `json:"ui_text,omitempty"`
+}
+
+type Assumption struct {
+	Kind  string `json:"kind"`  // e.g. "target_inferred", "date_inferred", "unit_default"
+	Value string `json:"value"`
+}
+
+type ParsedUIText struct {
+	Preview      string `json:"preview,omitempty"`
+	Confirmation string `json:"confirmation,omitempty"`
 }
 
 type ParsedExercise struct {
@@ -48,33 +62,34 @@ type ParsedCorrection struct {
 const parsePrompt = `You are a workout logging assistant. Parse the user's message and output JSON only.
 
 Output format (one of):
-- Log: {"intent":"log","date":"YYYY-MM-DD","exercises":[{"exercise_name":"Bench Press","variant_name":"standard","raw_speech":"bench 140x8","notes":"","sets":[{"weight":140,"reps":8,"set_type":"working","set_order":1}]}]}
-  Use "standard" for default variant. Date: use today's date ({{.Today}}) unless user says yesterday, last Tuesday, etc.
-- Query: {"intent":"query","category":"bench press","variant":"standard"}
-- Correction: {"intent":"correction","target_ref":"last bench","changes":{"weight":150}}
-- Remove: {"intent":"remove","category":"bench press","variant":"standard","target_ref":"last"}
-  User wants to delete/remove a logged entry. Phrases: "forget that", "remove it", "delete the last bench", "scratch that".
-  If user says "forget that" or "remove it" without naming exercise, omit category/variant (we remove most recent entry). Otherwise use category and variant. target_ref: "last" or "that".
-- Restore: {"intent":"restore"}
-  User wants to bring back a recently removed entry. Phrases: "bring that back", "oh sorry bring it back", "restore that", "undo that" (after having removed something).
-- Note: {"intent":"note","category":"deadlift","variant":"rdl","content":"warm up hamstrings first"}
-  User wants to add a reusable reminder for an exercise. Phrases: "remember for RDLs: warm up hamstrings", "add a note for deadlift: use straps when heavy", "note for bench: retract scapula".
-  category and variant identify the exercise (omit for global note). content is the reminder text.
-- Unclear: {"intent":"unknown"}
+- Log: {"intent":"log","date":"YYYY-MM-DD","exercises":[...],"assumptions":[],"ambiguities":[],"ui_text":{"preview":"..."}}
+- Query: {"intent":"query","category":"bench press","variant":"standard","assumptions":[],"ambiguities":[]}
+- Correction: {"intent":"correction","target_ref":"last bench","changes":{"weight":150},"assumptions":[],"ambiguities":[],"ui_text":{"preview":"Update your last bench set to 150 lb."}}
+- Remove: {"intent":"remove","category":"bench press","variant":"standard","target_ref":"last","assumptions":[],"ambiguities":[],"ui_text":{"preview":"Remove the last bench entry."}}
+  User wants to delete/remove a logged entry. If user says "forget that" or "remove it" without naming exercise, omit category/variant.
+- Restore: {"intent":"restore","assumptions":[],"ambiguities":[]}
+- Note: {"intent":"note","category":"deadlift","variant":"rdl","note_content":"warm up hamstrings first","assumptions":[],"ambiguities":[]}
+- Unclear: {"intent":"unknown","ambiguities":["unclear_intent"]}
+
+Required fields for ALL intents:
+- assumptions: array of {kind, value} for inferred facts. Examples: {"kind":"target_inferred","value":"last_created_set"}, {"kind":"date_inferred","value":"today"}, {"kind":"unit_default","value":"lb"}
+- ambiguities: array of strings. List ANY uncertainty: "target_unclear", "multiple_targets", "exercise_ambiguous", "date_ambiguous", "unclear_intent". If confident, use [].
+
+For correction/remove: include ui_text.preview with a short human-readable description of the action.
 
 Rules:
 - exercise_name: use common names (Bench Press, Deadlift, Squat, etc). Lowercase for category in query.
-- variant_name: "standard" unless user specifies (close grip, RDL, etc).
-- sets: weight in lbs, reps as int. set_order 1,2,3... set_type optional (working, warm-up, etc).
-- For bodyweight (push-ups, pull-ups): omit weight or null.
+- variant_name: "standard" unless user specifies.
+- sets: weight in lbs, reps as int. set_order 1,2,3... set_type optional.
+- For bodyweight: omit weight or null.
 - date: always YYYY-MM-DD. Infer "today" as {{.Today}}, "yesterday" as {{.Yesterday}}.
 - Output ONLY valid JSON, no markdown, no explanation.
 
-Context: You may receive recent conversation (User/Assistant turns) before the current message. Use it to resolve references like "that", "another one", "change it", "remove that" — they refer to the most recent relevant action.`
+Context: You may receive WORKOUT_CONTEXT and recent conversation. Use them to resolve "that", "another one", "last set", "change it" — they refer to the most recent relevant action. If target could match multiple entries (e.g. squat in today AND yesterday), add "multiple_targets" to ambiguities.`
 
 // Parser parses user text into structured intent.
 type Parser interface {
-	Parse(ctx context.Context, userID uuid.UUID, text string, recentMessages []ChatMessage) (*ParsedIntent, error)
+	Parse(ctx context.Context, userID uuid.UUID, text string, recentMessages []ChatMessage, workoutContext string) (*ParsedIntent, error)
 }
 
 type parserImpl struct {
@@ -85,11 +100,11 @@ func NewParser(client *Client) Parser {
 	return &parserImpl{client: client}
 }
 
-func (p *parserImpl) Parse(ctx context.Context, userID uuid.UUID, text string, recentMessages []ChatMessage) (*ParsedIntent, error) {
+func (p *parserImpl) Parse(ctx context.Context, userID uuid.UUID, text string, recentMessages []ChatMessage, workoutContext string) (*ParsedIntent, error) {
 	if p.client.testMode {
 		return p.parseMock(text)
 	}
-	return p.parseReal(ctx, userID, text, recentMessages)
+	return p.parseReal(ctx, userID, text, recentMessages, workoutContext)
 }
 
 func (p *parserImpl) parseMock(text string) (*ParsedIntent, error) {
@@ -129,12 +144,15 @@ func (p *parserImpl) parseMock(text string) (*ParsedIntent, error) {
 
 func ptrFloat(f float64) *float64 { return &f }
 
-func (p *parserImpl) parseReal(ctx context.Context, userID uuid.UUID, text string, recentMessages []ChatMessage) (*ParsedIntent, error) {
+func (p *parserImpl) parseReal(ctx context.Context, userID uuid.UUID, text string, recentMessages []ChatMessage, workoutContext string) (*ParsedIntent, error) {
 	now := time.Now()
 	today := now.Format("2006-01-02")
 	yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
 	prompt := strings.ReplaceAll(parsePrompt, "{{.Today}}", today)
 	prompt = strings.ReplaceAll(prompt, "{{.Yesterday}}", yesterday)
+	if workoutContext != "" {
+		prompt += "\n\nWORKOUT_CONTEXT (use for resolving \"that\", \"last set\", \"another one\", etc.):\n" + workoutContext
+	}
 	msgs := make([]ChatMessage, 0, 2+len(recentMessages)+1)
 	msgs = append(msgs, ChatMessage{Role: "system", Content: prompt})
 	msgs = append(msgs, recentMessages...)

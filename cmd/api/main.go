@@ -51,7 +51,7 @@ func main() {
 	exerciseSvc := exercise.NewService(exerciseRepo, aiClient)
 	parser := ai.NewParser(aiClient)
 	r2, _ := storage.NewR2()
-	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, queryService, correctionSvc, prSvc, prRepo, notesRepo, chatMessagesRepo, r2)
+	chatSvc := chat.NewService(aiClient, parser, sessionSvc, sessionRepo, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, queryService, correctionSvc, prSvc, prRepo, notesRepo, chatMessagesRepo, r2)
 
 	googleClientID := env.GoogleClientID()
 

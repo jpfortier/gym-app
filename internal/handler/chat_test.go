@@ -50,7 +50,7 @@ func TestChat_logIntent(t *testing.T) {
 	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
 	prSvc := pr.NewService(prRepo)
 
-	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, nil, nil)
+	chatSvc := chat.NewService(aiClient, parser, sessionSvc, sessionRepo, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, nil, nil)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
 	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(Chat(chatSvc))))
@@ -102,7 +102,7 @@ func TestChat_removeIntent(t *testing.T) {
 	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
 	prSvc := pr.NewService(prRepo)
 
-	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, nil, nil)
+	chatSvc := chat.NewService(aiClient, parser, sessionSvc, sessionRepo, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, nil, nil)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
 	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(Chat(chatSvc))))
@@ -189,7 +189,7 @@ func TestChat_contextStoresMessages(t *testing.T) {
 	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
 	prSvc := pr.NewService(prRepo)
 
-	chatSvc := chat.NewService(aiClient, parser, sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, chatMessagesRepo, nil)
+	chatSvc := chat.NewService(aiClient, parser, sessionSvc, sessionRepo, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, chatMessagesRepo, nil)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
 	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(Chat(chatSvc))))
@@ -212,3 +212,76 @@ func TestChat_contextStoresMessages(t *testing.T) {
 		t.Errorf("got %d chat_messages, want 2 (user + assistant)", count)
 	}
 }
+
+type mockParser struct {
+	intent *ai.ParsedIntent
+}
+
+func (m *mockParser) Parse(ctx context.Context, userID uuid.UUID, text string, recentMessages []ai.ChatMessage, workoutContext string) (*ai.ParsedIntent, error) {
+	return m.intent, nil
+}
+
+func TestChat_needsConfirmationWhenAmbiguous(t *testing.T) {
+	db := dbForTest(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	userRepo := user.NewRepo(db)
+	u := &user.User{GoogleID: "chat-ambig-" + uuid.New().String(), Email: "ambig@test.com", Name: "A"}
+	if err := userRepo.Create(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+
+	throttle := ai.NewThrottlerFromEnv()
+	aiClient := ai.NewClient(throttle, nil)
+	parser := &mockParser{
+		intent: &ai.ParsedIntent{
+			Intent:      "correction",
+			Category:   "squat",
+			Variant:     "standard",
+			TargetRef:   "last",
+			Changes:     &ai.ParsedCorrection{Weight: ptrFloat(205)},
+			Ambiguities: []string{"multiple_targets"},
+			UIText:      &ai.ParsedUIText{Preview: "Update your last squat to 205 lb."},
+		},
+	}
+	sessionRepo := session.NewRepo(db)
+	logentryRepo := logentry.NewRepo(db)
+	exerciseRepo := exercise.NewRepo(db)
+	exerciseSvc := exercise.NewService(exerciseRepo, aiClient)
+	prRepo := pr.NewRepo(db)
+	sessionSvc := session.NewService(sessionRepo)
+	logentrySvc := logentry.NewService(logentryRepo, sessionSvc)
+	querySvc := query.NewService(exerciseRepo, logentryRepo, sessionRepo)
+	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
+	prSvc := pr.NewService(prRepo)
+
+	chatSvc := chat.NewService(aiClient, parser, sessionSvc, sessionRepo, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo, querySvc, correctionSvc, prSvc, prRepo, nil, nil, nil)
+	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
+	mux := http.NewServeMux()
+	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(Chat(chatSvc))))
+
+	body, _ := json.Marshal(map[string]string{"text": "change the last squat to 205"})
+	req := httptest.NewRequest(http.MethodPost, "/chat", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer x")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got status %d: %s", rec.Code, rec.Body.String())
+	}
+	var out map[string]interface{}
+	if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out["needs_confirmation"] != true {
+		t.Errorf("got needs_confirmation %v, want true", out["needs_confirmation"])
+	}
+	if out["intent"] != "correction" {
+		t.Errorf("got intent %v, want correction", out["intent"])
+	}
+}
+
+func ptrFloat(f float64) *float64 { return &f }

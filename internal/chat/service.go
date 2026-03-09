@@ -19,6 +19,7 @@ import (
 	"github.com/jpfortier/gym-app/internal/query"
 	"github.com/jpfortier/gym-app/internal/session"
 	"github.com/jpfortier/gym-app/internal/storage"
+	"github.com/jpfortier/gym-app/internal/workoutcontext"
 )
 
 // Response is the unified chat response.
@@ -28,6 +29,7 @@ type Response struct {
 	Entries  []LogResult   `json:"entries,omitempty"`
 	History  *HistoryResult `json:"history,omitempty"`
 	PRs      []PRResult    `json:"prs,omitempty"`
+	NeedsConfirmation bool   `json:"needs_confirmation,omitempty"`
 }
 
 type LogResult struct {
@@ -53,26 +55,29 @@ type PRResult struct {
 }
 
 type Service struct {
-	client        *ai.Client
-	parser        ai.Parser
-	sessionSvc    *session.Service
-	logentrySvc   *logentry.Service
-	logentryRepo  *logentry.Repo
-	exerciseSvc   *exercise.Service
-	exerciseRepo  *exercise.Repo
-	querySvc      *query.Service
-	correctionSvc *correction.Service
-	prSvc         *pr.Service
+	client           *ai.Client
+	parser           ai.Parser
+	sessionSvc       *session.Service
+	sessionRepo      *session.Repo
+	logentrySvc      *logentry.Service
+	logentryRepo     *logentry.Repo
+	exerciseSvc      *exercise.Service
+	exerciseRepo     *exercise.Repo
+	querySvc         *query.Service
+	correctionSvc    *correction.Service
+	prSvc            *pr.Service
 	prRepo           *pr.Repo
 	notesRepo        *notes.Repo
 	chatMessagesRepo *chatmessages.Repo
 	r2               *storage.R2
+	workoutCtxBuilder *workoutcontext.Builder
 }
 
 func NewService(
 	client *ai.Client,
 	parser ai.Parser,
 	sessionSvc *session.Service,
+	sessionRepo *session.Repo,
 	logentrySvc *logentry.Service,
 	logentryRepo *logentry.Repo,
 	exerciseSvc *exercise.Service,
@@ -86,20 +91,22 @@ func NewService(
 	r2 *storage.R2,
 ) *Service {
 	return &Service{
-		client:           client,
-		parser:           parser,
-		sessionSvc:       sessionSvc,
-		logentrySvc:      logentrySvc,
-		logentryRepo:     logentryRepo,
-		exerciseSvc:      exerciseSvc,
-		exerciseRepo:     exerciseRepo,
-		querySvc:         querySvc,
-		correctionSvc:    correctionSvc,
-		prSvc:            prSvc,
-		prRepo:           prRepo,
-		notesRepo:        notesRepo,
-		chatMessagesRepo: chatMessagesRepo,
-		r2:               r2,
+		client:            client,
+		parser:            parser,
+		sessionSvc:        sessionSvc,
+		sessionRepo:       sessionRepo,
+		logentrySvc:       logentrySvc,
+		logentryRepo:      logentryRepo,
+		exerciseSvc:       exerciseSvc,
+		exerciseRepo:      exerciseRepo,
+		querySvc:          querySvc,
+		correctionSvc:     correctionSvc,
+		prSvc:             prSvc,
+		prRepo:            prRepo,
+		notesRepo:         notesRepo,
+		chatMessagesRepo:  chatMessagesRepo,
+		r2:                r2,
+		workoutCtxBuilder: workoutcontext.NewBuilder(sessionRepo, logentryRepo, exerciseRepo),
 	}
 }
 
@@ -117,9 +124,24 @@ func (s *Service) Process(ctx context.Context, userID uuid.UUID, text string, au
 		return &Response{Intent: "unknown", Message: "No input received."}, nil
 	}
 	recent := s.loadRecentMessages(ctx, userID)
-	intent, err := s.parser.Parse(ctx, userID, text, recent)
+	var workoutCtxStr string
+	if s.workoutCtxBuilder != nil {
+		if wc, err := s.workoutCtxBuilder.Build(ctx, userID); err == nil {
+			workoutCtxStr = wc.FormatForLLM()
+		}
+	}
+	intent, err := s.parser.Parse(ctx, userID, text, recent, workoutCtxStr)
 	if err != nil {
 		return nil, fmt.Errorf("parse: %w", err)
+	}
+	if s.requiresConfirmation(intent) {
+		msg := "I need a bit more detail to be sure."
+		if intent.UIText != nil && intent.UIText.Preview != "" {
+			msg = intent.UIText.Preview + " Can you clarify which one you mean?"
+		} else if len(intent.Ambiguities) > 0 {
+			msg = "I'm not sure which entry you mean. Can you be more specific?"
+		}
+		return &Response{Intent: intent.Intent, Message: msg, NeedsConfirmation: true}, nil
 	}
 	var resp *Response
 	var handleErr error
@@ -147,6 +169,18 @@ func (s *Service) Process(ctx context.Context, userID uuid.UUID, text string, au
 }
 
 const contextWindowSize = 6
+
+func (s *Service) requiresConfirmation(intent *ai.ParsedIntent) bool {
+	if intent == nil || len(intent.Ambiguities) == 0 {
+		return false
+	}
+	switch intent.Intent {
+	case "correction", "remove":
+		return true
+	default:
+		return false
+	}
+}
 
 func (s *Service) loadRecentMessages(ctx context.Context, userID uuid.UUID) []ai.ChatMessage {
 	if s.chatMessagesRepo == nil {
