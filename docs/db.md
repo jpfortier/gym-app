@@ -4,6 +4,8 @@
 
 Postgres on Fly. Migrations via golang-migrate.
 
+**Schema reference:** `docs/schema.sql` — consolidated DDL (refresh with `make schema-dump`).
+
 **Embeddings:** Store vectors for exercise categories and variants (pgvector or separate table). Cosine similarity for semantic matching.
 
 ## Tables (Planned)

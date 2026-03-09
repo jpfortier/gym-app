@@ -1,4 +1,4 @@
-.PHONY: migrate-up migrate-down migrate-create verify-openai test lint
+.PHONY: migrate-up migrate-down migrate-create schema-dump verify-openai test lint
 
 lint:
 	$(shell go env GOPATH)/bin/golangci-lint run
@@ -15,6 +15,13 @@ migrate-up:
 migrate-down:
 	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
 	$(MIGRATE) -path migrations -database "$${GYM_DATABASE_URL:-$$DATABASE_URL}" down
+
+# Dump current schema to docs/schema.sql. Run after migrations. Uses .env for GYM_DATABASE_URL.
+# Requires pg_dump version >= Postgres server (e.g. brew install postgresql@17 for Fly Postgres 17).
+schema-dump:
+	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
+	pg_dump -d "$${GYM_DATABASE_URL:-$$DATABASE_URL}" --schema-only --no-owner --no-privileges -f docs/schema.sql && \
+	echo "Wrote docs/schema.sql" || (echo "pg_dump failed (version mismatch? need pg_dump >= server)"; exit 1)
 
 # Run tests. Uses .env for GYM_* vars.
 test:
