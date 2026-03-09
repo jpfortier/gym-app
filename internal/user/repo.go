@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/google/uuid"
 	"github.com/jpfortier/gym-app/internal/db"
 )
 
@@ -43,4 +44,9 @@ func (r *Repo) Create(ctx context.Context, u *User) error {
 		 RETURNING id, created_at`,
 		u.ID, u.GoogleID, u.Email, u.Name, u.PhotoURL,
 	).Scan(&u.ID, &u.CreatedAt)
+}
+
+func (r *Repo) UpdateName(ctx context.Context, userID uuid.UUID, name string) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE users SET name = $1 WHERE id = $2`, name, userID)
+	return err
 }

@@ -5,6 +5,7 @@
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | `GET` | `/me` | Current user (id, email, name, photo_url). Verify auth. |
+| `GET` | `/chat/messages` | Chat history. Lazy-load with `?before=<id>`. Default limit 6. |
 | `POST` | `/chat` | Main entry. Text or audio. Server infers intent (log, query, correction, remove, restore, note). |
 | `GET` | `/sessions` | List workout sessions (timeline). Optional: `?limit=`. |
 | `GET` | `/sessions/{id}` | Session detail with log entries and sets. |
@@ -15,6 +16,13 @@
 | `GET` | `/health` | Health check. No auth. |
 
 All log creation goes through POST /chat. No manual write endpoint. See `docs/android-api.md` for full client reference.
+
+## GET /chat/messages
+
+- **Purpose:** Load chat history for display. Initial load returns last N messages (default 6). Lazy-load older messages when user scrolls up.
+- **Query params:** `limit` (default 6, max 50), `before` (message UUID for cursor-based pagination; omit for initial load).
+- **Response:** `{ "messages": [{ "id": "uuid", "role": "user"|"assistant", "content": "...", "created_at": "..." }] }`
+- **Order:** Chronological (oldest first). Append new messages from POST /chat to local list.
 
 ## GET /query
 

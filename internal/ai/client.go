@@ -35,6 +35,10 @@ func NewClient(throttle *Throttler, usage UsageRecorder) *Client {
 	return &Client{client: client, throttle: throttle, usage: usage, testMode: testMode}
 }
 
+func (c *Client) TestMode() bool {
+	return c.testMode
+}
+
 // Transcribe decodes base64 audio and returns text. Throttled.
 // fileExt is optional (e.g. "m4a", "webm"); defaults to "webm" if empty.
 func (c *Client) Transcribe(ctx context.Context, userID uuid.UUID, audioBase64 string, fileExt string) (string, error) {

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -19,6 +20,7 @@ import (
 	"github.com/jpfortier/gym-app/internal/correction"
 	"github.com/jpfortier/gym-app/internal/exercise"
 	"github.com/jpfortier/gym-app/internal/logentry"
+	"github.com/jpfortier/gym-app/internal/name"
 	"github.com/jpfortier/gym-app/internal/pr"
 	"github.com/jpfortier/gym-app/internal/query"
 	"github.com/jpfortier/gym-app/internal/session"
@@ -44,7 +46,8 @@ func chatTestService(t *testing.T, db *sql.DB, chatMessagesRepo *chatmessages.Re
 	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
 	prSvc := pr.NewService(prRepo)
 	return chat.NewService(chat.Config{
-		Client: aiClient, Parser: parser, SessionSvc: sessionSvc, SessionRepo: sessionRepo,
+		Client: aiClient, Parser: parser, UserRepo: user.NewRepo(db), NameHandler: name.NewHandler(aiClient),
+		SessionSvc: sessionSvc, SessionRepo: sessionRepo,
 		LogentrySvc: logentrySvc, LogentryRepo: logentryRepo,
 		ExerciseSvc: exerciseSvc, ExerciseRepo: exerciseRepo, QuerySvc: querySvc, CorrectionSvc: correctionSvc,
 		PrSvc: prSvc, PrRepo: prRepo, NotesRepo: nil, ChatMessagesRepo: chatMessagesRepo, R2: nil,
@@ -204,7 +207,7 @@ type mockParser struct {
 	intent *ai.ParsedIntent
 }
 
-func (m *mockParser) Parse(ctx context.Context, userID uuid.UUID, text string, recentMessages []ai.ChatMessage, workoutContext string) (*ai.ParsedIntent, error) {
+func (m *mockParser) Parse(ctx context.Context, userID uuid.UUID, text string, recentMessages []ai.ChatMessage, workoutContext string, userName string) (*ai.ParsedIntent, error) {
 	return m.intent, nil
 }
 
@@ -255,6 +258,53 @@ func TestChat_needsConfirmationWhenAmbiguous(t *testing.T) {
 	}
 	if out["intent"] != "correction" {
 		t.Errorf("got intent %v, want correction", out["intent"])
+	}
+}
+
+func TestChat_setName(t *testing.T) {
+	db := dbForTest(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	userRepo := user.NewRepo(db)
+	u := &user.User{GoogleID: "name-" + uuid.New().String(), Email: "name@test.com", Name: ""}
+	if err := userRepo.Create(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM chat_messages WHERE user_id = $1", u.ID) })
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+
+	mux := chatTestServer(t, db, u, nil)
+
+	body, _ := json.Marshal(map[string]string{"text": "Peter"})
+	req := httptest.NewRequest(http.MethodPost, "/chat", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer x")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("got status %d: %s", rec.Code, rec.Body.String())
+	}
+	var out map[string]interface{}
+	if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out["intent"] != "set_name" {
+		t.Errorf("got intent %v, want set_name", out["intent"])
+	}
+	msg, _ := out["message"].(string)
+	if msg == "" {
+		t.Error("expected message")
+	}
+	// Mock twist: Peter -> Pete
+	if !strings.Contains(msg, "Pete") && !strings.Contains(msg, "Peter") {
+		t.Errorf("message should mention name: %q", msg)
+	}
+	// Verify user name was updated
+	got, _ := userRepo.GetByGoogleID(ctx, u.GoogleID)
+	if got == nil || got.Name == "" {
+		t.Error("expected user name to be set")
 	}
 }
 

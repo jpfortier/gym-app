@@ -55,6 +55,27 @@ Complete reference for building the Android client. Copy this into your context 
 
 ---
 
+### GET /chat/messages
+
+**Auth:** Required  
+**Purpose:** Load chat history. Call on app open. Lazy-load older messages when user scrolls up.
+
+**Query params:** `limit` (default 6, max 50), `before` (message UUID for cursor; omit for initial load).
+
+**Response 200:**
+```json
+{
+  "messages": [
+    { "id": "uuid", "role": "user", "content": "bench 135 for 8", "created_at": "2025-03-08T14:30:00Z" },
+    { "id": "uuid", "role": "assistant", "content": "Logged bench press 135×8.", "created_at": "2025-03-08T14:30:01Z" }
+  ]
+}
+```
+- **Initial:** `GET /chat/messages?limit=6` — last 6, chronological.
+- **Scroll up:** `GET /chat/messages?before=<oldest_id>&limit=6` — 6 older. Prepend.
+
+---
+
 ### POST /chat
 
 **Auth:** Required  
@@ -358,6 +379,7 @@ All errors (except 404/503 for specific cases) return:
 | Action | Endpoint | Notes |
 |--------|----------|-------|
 | Verify auth | GET /me | After Google Sign-In |
+| Load chat history | GET /chat/messages | Initial: limit=6. Scroll up: before=id |
 | Log workout | POST /chat | Text or audio; server infers |
 | Query history | POST /chat or GET /query | Chat: natural language. Query: direct params |
 | Correct entry | POST /chat | "change that to 140" |

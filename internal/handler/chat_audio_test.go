@@ -64,7 +64,7 @@ func TestChat_audioSamples(t *testing.T) {
 			}
 			b64 := base64.StdEncoding.EncodeToString(data)
 
-			resp, err := chatSvc.Process(ctx, u.ID, "", b64, "m4a")
+			resp, err := chatSvc.Process(ctx, u, "", b64, "m4a")
 			if err != nil {
 				t.Fatalf("Process: %v", err)
 			}

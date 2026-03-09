@@ -12,7 +12,7 @@ import (
 
 // ParsedIntent is the structured output from the LLM.
 type ParsedIntent struct {
-	Intent string `json:"intent"` // "log" | "query" | "correction" | "remove" | "restore" | "note" | "unknown"
+	Intent string `json:"intent"` // "log" | "query" | "correction" | "remove" | "restore" | "note" | "set_name" | "update_name" | "unknown"
 	// Log
 	Date      string          `json:"date,omitempty"`      // YYYY-MM-DD
 	Exercises []ParsedExercise `json:"exercises,omitempty"`
@@ -23,6 +23,8 @@ type ParsedIntent struct {
 	Changes   *ParsedCorrection `json:"changes,omitempty"`
 	// Note
 	NoteContent string `json:"note_content,omitempty"`
+	// Set/Update name
+	Name string `json:"name,omitempty"`
 	// Assumption ledger: explicit vs inferred, ambiguities
 	Assumptions []Assumption   `json:"assumptions,omitempty"`
 	Ambiguities []string       `json:"ambiguities,omitempty"`
@@ -69,6 +71,8 @@ Output format (one of):
   User wants to delete/remove a logged entry. If user says "forget that" or "remove it" without naming exercise, omit category/variant.
 - Restore: {"intent":"restore","assumptions":[],"ambiguities":[]}
 - Note: {"intent":"note","category":"deadlift","variant":"rdl","note_content":"warm up hamstrings first","assumptions":[],"ambiguities":[]}
+- Set name: {"intent":"set_name","name":"Peter"} — ONLY when user_name is empty. Accept: "my name is X", "I'm X", "call me X", or a single word X.
+- Update name: {"intent":"update_name","name":"Mary"} — ONLY when user_name is set AND user explicitly asks to change: "change my name to X", "update my name to X", "my name is actually X". Do NOT use for casual "Peter" or "Mary" when name is set.
 - Unclear: {"intent":"unknown","ambiguities":["unclear_intent"]}
 
 Required fields for ALL intents:
@@ -85,11 +89,12 @@ Rules:
 - date: always YYYY-MM-DD. Infer "today" as {{.Today}}, "yesterday" as {{.Yesterday}}.
 - Output ONLY valid JSON, no markdown, no explanation.
 
-Context: You may receive WORKOUT_CONTEXT and recent conversation. Use them to resolve "that", "another one", "last set", "change it" — they refer to the most recent relevant action. If target could match multiple entries (e.g. squat in today AND yesterday), add "multiple_targets" to ambiguities.`
+Context: You may receive WORKOUT_CONTEXT and recent conversation.
+User context: user_name is "{{.UserName}}" (empty means name not set). Use for set_name vs update_name rules above. Use them to resolve "that", "another one", "last set", "change it" — they refer to the most recent relevant action. If target could match multiple entries (e.g. squat in today AND yesterday), add "multiple_targets" to ambiguities.`
 
 // Parser parses user text into structured intent.
 type Parser interface {
-	Parse(ctx context.Context, userID uuid.UUID, text string, recentMessages []ChatMessage, workoutContext string) (*ParsedIntent, error)
+	Parse(ctx context.Context, userID uuid.UUID, text string, recentMessages []ChatMessage, workoutContext string, userName string) (*ParsedIntent, error)
 }
 
 type parserImpl struct {
@@ -100,15 +105,52 @@ func NewParser(client *Client) Parser {
 	return &parserImpl{client: client}
 }
 
-func (p *parserImpl) Parse(ctx context.Context, userID uuid.UUID, text string, recentMessages []ChatMessage, workoutContext string) (*ParsedIntent, error) {
+func (p *parserImpl) Parse(ctx context.Context, userID uuid.UUID, text string, recentMessages []ChatMessage, workoutContext string, userName string) (*ParsedIntent, error) {
 	if p.client.testMode {
-		return p.parseMock(text)
+		return p.parseMock(text, userName)
 	}
-	return p.parseReal(ctx, userID, text, recentMessages, workoutContext)
+	return p.parseReal(ctx, userID, text, recentMessages, workoutContext, userName)
 }
 
-func (p *parserImpl) parseMock(text string) (*ParsedIntent, error) {
+var exerciseWords = map[string]bool{
+	"bench": true, "squat": true, "deadlift": true, "press": true, "row": true, "curl": true,
+	"rdl": true, "ohp": true, "pull": true, "push": true, "lunge": true, "plank": true,
+}
+
+func (p *parserImpl) parseMock(text string, userName string) (*ParsedIntent, error) {
 	text = strings.TrimSpace(strings.ToLower(text))
+	if userName == "" {
+		if strings.HasPrefix(text, "my name is ") || strings.HasPrefix(text, "i'm ") || strings.HasPrefix(text, "call me ") {
+			var name string
+			switch {
+			case strings.HasPrefix(text, "my name is "):
+				name = strings.TrimPrefix(text, "my name is ")
+			case strings.HasPrefix(text, "i'm "):
+				name = strings.TrimPrefix(text, "i'm ")
+			default:
+				name = strings.TrimPrefix(text, "call me ")
+			}
+			return &ParsedIntent{Intent: "set_name", Name: strings.TrimSpace(name)}, nil
+		}
+		if !strings.Contains(text, " ") && !exerciseWords[text] && len(text) > 1 {
+			return &ParsedIntent{Intent: "set_name", Name: text}, nil
+		}
+	}
+	if userName != "" && (strings.Contains(text, "change") && strings.Contains(text, "name") || strings.Contains(text, "update") && strings.Contains(text, "name") || strings.HasPrefix(text, "my name is ")) {
+		name := text
+		if strings.HasPrefix(text, "my name is ") {
+			name = strings.TrimPrefix(text, "my name is ")
+		} else {
+			parts := strings.Fields(text)
+			for i, part := range parts {
+				if (part == "to" || part == "is") && i+1 < len(parts) {
+					name = strings.Join(parts[i+1:], " ")
+					break
+				}
+			}
+		}
+		return &ParsedIntent{Intent: "update_name", Name: strings.TrimSpace(name)}, nil
+	}
 	if strings.Contains(text, "what") || strings.Contains(text, "how much") || strings.Contains(text, "history") {
 		return &ParsedIntent{Intent: "query", Category: "bench press", Variant: "standard"}, nil
 	}
@@ -144,12 +186,13 @@ func (p *parserImpl) parseMock(text string) (*ParsedIntent, error) {
 
 func ptrFloat(f float64) *float64 { return &f }
 
-func (p *parserImpl) parseReal(ctx context.Context, userID uuid.UUID, text string, recentMessages []ChatMessage, workoutContext string) (*ParsedIntent, error) {
+func (p *parserImpl) parseReal(ctx context.Context, userID uuid.UUID, text string, recentMessages []ChatMessage, workoutContext string, userName string) (*ParsedIntent, error) {
 	now := time.Now()
 	today := now.Format("2006-01-02")
 	yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
 	prompt := strings.ReplaceAll(parsePrompt, "{{.Today}}", today)
 	prompt = strings.ReplaceAll(prompt, "{{.Yesterday}}", yesterday)
+	prompt = strings.ReplaceAll(prompt, "{{.UserName}}", userName)
 	if workoutContext != "" {
 		prompt += "\n\nWORKOUT_CONTEXT (use for resolving \"that\", \"last set\", \"another one\", etc.):\n" + workoutContext
 	}

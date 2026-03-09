@@ -16,9 +16,11 @@ import (
 	"github.com/jpfortier/gym-app/internal/logentry"
 	"github.com/jpfortier/gym-app/internal/notes"
 	"github.com/jpfortier/gym-app/internal/pr"
+	"github.com/jpfortier/gym-app/internal/name"
 	"github.com/jpfortier/gym-app/internal/query"
 	"github.com/jpfortier/gym-app/internal/session"
 	"github.com/jpfortier/gym-app/internal/storage"
+	"github.com/jpfortier/gym-app/internal/user"
 	"github.com/jpfortier/gym-app/internal/workoutcontext"
 )
 
@@ -58,6 +60,8 @@ type PRResult struct {
 type Config struct {
 	Client           *ai.Client
 	Parser           ai.Parser
+	UserRepo         *user.Repo
+	NameHandler      *name.Handler
 	SessionSvc       *session.Service
 	SessionRepo      *session.Repo
 	LogentrySvc      *logentry.Service
@@ -76,6 +80,8 @@ type Config struct {
 type Service struct {
 	client           *ai.Client
 	parser           ai.Parser
+	userRepo         *user.Repo
+	nameHandler      *name.Handler
 	sessionSvc       *session.Service
 	logentrySvc      *logentry.Service
 	logentryRepo     *logentry.Repo
@@ -99,6 +105,8 @@ func NewService(cfg Config) *Service {
 	return &Service{
 		client:            cfg.Client,
 		parser:            cfg.Parser,
+		userRepo:          cfg.UserRepo,
+		nameHandler:       cfg.NameHandler,
 		sessionSvc:        cfg.SessionSvc,
 		logentrySvc:       cfg.LogentrySvc,
 		logentryRepo:      cfg.LogentryRepo,
@@ -117,7 +125,8 @@ func NewService(cfg Config) *Service {
 
 // Process handles text or audio and returns the response.
 // audioFormat is optional (e.g. "m4a", "webm"); used when audioBase64 is provided.
-func (s *Service) Process(ctx context.Context, userID uuid.UUID, text string, audioBase64 string, audioFormat string) (*Response, error) {
+func (s *Service) Process(ctx context.Context, u *user.User, text string, audioBase64 string, audioFormat string) (*Response, error) {
+	userID := u.ID
 	if text == "" && audioBase64 != "" {
 		var err error
 		text, err = s.client.Transcribe(ctx, userID, audioBase64, audioFormat)
@@ -135,7 +144,7 @@ func (s *Service) Process(ctx context.Context, userID uuid.UUID, text string, au
 			workoutCtxStr = wc.FormatForLLM()
 		}
 	}
-	intent, err := s.parser.Parse(ctx, userID, text, recent, workoutCtxStr)
+	intent, err := s.parser.Parse(ctx, userID, text, recent, workoutCtxStr, u.Name)
 	if err != nil {
 		return nil, fmt.Errorf("parse: %w", err)
 	}
@@ -163,6 +172,8 @@ func (s *Service) Process(ctx context.Context, userID uuid.UUID, text string, au
 		resp, handleErr = s.handleRestore(ctx, userID, intent)
 	case "note":
 		resp, handleErr = s.handleNote(ctx, userID, intent)
+	case "set_name", "update_name":
+		resp, handleErr = s.handleName(ctx, u, intent)
 	default:
 		resp = &Response{Intent: "unknown", Message: "I didn't understand. Try logging a workout, asking about your history, correcting a previous entry, or removing something."}
 	}
@@ -254,6 +265,8 @@ func buildAssistantSummary(r *Response, intent *ai.ParsedIntent) string {
 		return "Brought back."
 	case "note":
 		return "Noted."
+	case "set_name", "update_name":
+		return r.Message
 	default:
 		return r.Message
 	}
@@ -430,6 +443,25 @@ func (s *Service) handleNote(ctx context.Context, userID uuid.UUID, intent *ai.P
 		return nil, err
 	}
 	return &Response{Intent: "note", Message: "Noted."}, nil
+}
+
+func (s *Service) handleName(ctx context.Context, u *user.User, intent *ai.ParsedIntent) (*Response, error) {
+	if s.nameHandler == nil || s.userRepo == nil {
+		return &Response{Intent: intent.Intent, Message: "Name feature not available."}, nil
+	}
+	rawName := strings.TrimSpace(intent.Name)
+	if rawName == "" {
+		return &Response{Intent: intent.Intent, Message: "What should I call you?"}, nil
+	}
+	isRename := intent.Intent == "update_name"
+	storedName, msg, err := s.nameHandler.Process(ctx, u.ID, rawName, isRename)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.userRepo.UpdateName(ctx, u.ID, storedName); err != nil {
+		return nil, err
+	}
+	return &Response{Intent: intent.Intent, Message: msg}, nil
 }
 
 func (s *Service) handleCorrection(ctx context.Context, userID uuid.UUID, intent *ai.ParsedIntent) (*Response, error) {

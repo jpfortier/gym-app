@@ -22,9 +22,29 @@ import (
 	"github.com/jpfortier/gym-app/internal/query"
 	"github.com/jpfortier/gym-app/internal/session"
 	"github.com/jpfortier/gym-app/internal/storage"
+	"github.com/jpfortier/gym-app/internal/name"
 	"github.com/jpfortier/gym-app/internal/usage"
 	"github.com/jpfortier/gym-app/internal/user"
 )
+
+const welcomeMessage = "Welcome to the app. What's your name?"
+
+type userStoreWithWelcome struct {
+	userRepo         *user.Repo
+	chatMessagesRepo *chatmessages.Repo
+}
+
+func (s *userStoreWithWelcome) GetByGoogleID(ctx context.Context, googleID string) (*user.User, error) {
+	return s.userRepo.GetByGoogleID(ctx, googleID)
+}
+
+func (s *userStoreWithWelcome) Create(ctx context.Context, u *user.User) error {
+	if err := s.userRepo.Create(ctx, u); err != nil {
+		return err
+	}
+	_ = s.chatMessagesRepo.Append(ctx, u.ID, "assistant", welcomeMessage)
+	return nil
+}
 
 // Server holds the HTTP server and dependencies.
 type Server struct {
@@ -64,6 +84,8 @@ func NewServer(ctx context.Context) (*Server, error) {
 	chatSvc := chat.NewService(chat.Config{
 		Client:           aiClient,
 		Parser:           parser,
+		UserRepo:         userRepo,
+		NameHandler:      name.NewHandler(aiClient),
 		SessionSvc:       sessionSvc,
 		SessionRepo:      sessionRepo,
 		LogentrySvc:      logentrySvc,
@@ -81,18 +103,20 @@ func NewServer(ctx context.Context) (*Server, error) {
 
 	googleClientID := env.GoogleClientID()
 	verifier := auth.GoogleVerifier{}
+	userStore := &userStoreWithWelcome{userRepo: userRepo, chatMessagesRepo: chatMessagesRepo}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", handler.Health(database))
-	mux.Handle("GET /me", auth.RequireAuth(verifier, userRepo, googleClientID)(http.HandlerFunc(handler.Me)))
-	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, googleClientID)(http.HandlerFunc(handler.Chat(chatSvc))))
-	mux.Handle("GET /sessions", auth.RequireAuth(verifier, userRepo, googleClientID)(http.HandlerFunc(handler.SessionsList(sessionRepo))))
-	mux.Handle("GET /sessions/{id}", auth.RequireAuth(verifier, userRepo, googleClientID)(http.HandlerFunc(handler.SessionDetail(sessionRepo, logentryRepo, exerciseRepo))))
-	mux.Handle("GET /exercises", auth.RequireAuth(verifier, userRepo, googleClientID)(http.HandlerFunc(handler.ExercisesList(exerciseRepo))))
-	mux.Handle("GET /query", auth.RequireAuth(verifier, userRepo, googleClientID)(http.HandlerFunc(handler.QueryHistory(queryService, exerciseRepo))))
-	mux.Handle("GET /prs", auth.RequireAuth(verifier, userRepo, googleClientID)(http.HandlerFunc(handler.PRsList(prRepo, exerciseRepo))))
+	mux.Handle("GET /me", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.Me)))
+	mux.Handle("GET /chat/messages", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.ChatMessages(chatMessagesRepo))))
+	mux.Handle("POST /chat", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.Chat(chatSvc))))
+	mux.Handle("GET /sessions", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.SessionsList(sessionRepo))))
+	mux.Handle("GET /sessions/{id}", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.SessionDetail(sessionRepo, logentryRepo, exerciseRepo))))
+	mux.Handle("GET /exercises", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.ExercisesList(exerciseRepo))))
+	mux.Handle("GET /query", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.QueryHistory(queryService, exerciseRepo))))
+	mux.Handle("GET /prs", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.PRsList(prRepo, exerciseRepo))))
 	if r2 != nil {
-		mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userRepo, googleClientID)(http.HandlerFunc(handler.PRImage(prRepo, r2))))
+		mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.PRImage(prRepo, r2))))
 	}
 
 	return &Server{mux: mux, db: database}, nil

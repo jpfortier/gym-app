@@ -9,7 +9,7 @@ import (
 	"github.com/jpfortier/gym-app/internal/env"
 )
 
-// DBForTest returns a DB connection for tests. Skips if DB is unavailable.
+// DBForTest returns a DB connection for tests. Fails if DB is unavailable.
 func DBForTest(t *testing.T) *sql.DB {
 	t.Helper()
 	connStr := env.DatabaseURL()
@@ -18,10 +18,10 @@ func DBForTest(t *testing.T) *sql.DB {
 	}
 	db, err := sql.Open("pgx", connStr)
 	if err != nil {
-		t.Skip("DB not available:", err)
+		t.Fatal("DB not available:", err)
 	}
 	if err := db.Ping(); err != nil {
-		t.Skip("DB not reachable (proxy may be down):", err)
+		t.Fatal("DB not reachable:", err)
 	}
 	return db
 }

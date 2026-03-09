@@ -38,6 +38,42 @@ Reference for the Android app. All endpoints require authentication unless noted
 
 ---
 
+### GET /chat/messages
+
+**Auth:** Required
+
+**Purpose:** Load chat history. Call on app open for initial messages. Lazy-load older messages when user scrolls up.
+
+**Query params:**
+| Param | Type | Default | Description |
+|-------|------|---------|--------------|
+| `limit` | int | 6 | Max messages (1–50) |
+| `before` | uuid | — | Cursor for older messages. Omit for initial load. |
+
+**Response 200:**
+```json
+{
+  "messages": [
+    {
+      "id": "uuid",
+      "role": "user",
+      "content": "bench press 135 for 8",
+      "created_at": "2025-03-08T14:30:00Z"
+    },
+    {
+      "id": "uuid",
+      "role": "assistant",
+      "content": "Logged bench press 135×8.",
+      "created_at": "2025-03-08T14:30:01Z"
+    }
+  ]
+}
+```
+- **Initial load:** `GET /chat/messages?limit=6` — last 6 messages, chronological.
+- **Scroll up:** `GET /chat/messages?before=<oldest_message_id>&limit=6` — 6 older messages. Prepend to list.
+
+---
+
 ### POST /chat
 
 **Auth:** Required
@@ -366,6 +402,7 @@ All errors (except 404/503 for specific cases) return:
 | Action | Endpoint | Notes |
 |--------|----------|-------|
 | Verify auth | GET /me | After Google Sign-In |
+| Load chat history | GET /chat/messages | Initial: limit=6. Scroll up: before=id |
 | Log workout | POST /chat | Text or audio; server infers |
 | Query history | POST /chat or GET /query | Chat: natural language. Query: direct params |
 | Correct entry | POST /chat | "change that to 140" |

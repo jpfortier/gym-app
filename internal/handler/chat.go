@@ -28,7 +28,7 @@ func Chat(chatSvc *chat.Service) http.HandlerFunc {
 			JSONError(w, "invalid JSON", "invalid_input", http.StatusBadRequest)
 			return
 		}
-		resp, err := chatSvc.Process(r.Context(), u.ID, req.Text, req.AudioBase64, req.AudioFormat)
+		resp, err := chatSvc.Process(r.Context(), u, req.Text, req.AudioBase64, req.AudioFormat)
 		if err != nil {
 			JSONError(w, "processing failed", "internal_error", http.StatusInternalServerError)
 			return
