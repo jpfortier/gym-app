@@ -7,24 +7,11 @@ import (
 	"testing"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-
-	"github.com/jpfortier/gym-app/internal/env"
 )
 
 func TestHealth_ok(t *testing.T) {
-	connStr := env.DatabaseURL()
-	if connStr == "" {
-		connStr = "postgres://postgres:gym-dev-2025@localhost:15432/postgres?sslmode=disable"
-	}
-	db, err := sql.Open("pgx", connStr)
-	if err != nil {
-		t.Skip("DB not available:", err)
-	}
+	db := dbForTest(t)
 	defer db.Close()
-
-	if err := db.Ping(); err != nil {
-		t.Skip("DB not reachable (proxy may be down):", err)
-	}
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()

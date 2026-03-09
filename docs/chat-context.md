@@ -107,7 +107,7 @@ CREATE INDEX idx_chat_messages_user_created ON chat_messages(user_id, created_at
 
 ### 6. Tests
 
-- Test with `OPENAI_TEST_MODE`: mock returns messages; chat service still stores/retrieves.
+- Test with `GYM_OPENAI_TEST_MODE`: mock returns messages; chat service still stores/retrieves.
 - Integration test: "bench 135" → "and 140" → verify second parse gets context and logs correctly.
 - Test that Append happens after successful processing.
 

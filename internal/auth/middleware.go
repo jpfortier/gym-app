@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/jpfortier/gym-app/internal/httputil"
 	"github.com/jpfortier/gym-app/internal/user"
 	"google.golang.org/api/idtoken"
 )
@@ -40,21 +41,21 @@ func RequireAuth(verifier Verifier, userStore UserStore, googleClientID string) 
 			token := extractBearerToken(r)
 			if token == "" {
 				slog.Debug("auth: missing bearer token")
-				http.Error(w, `{"error":"missing authorization"}`, http.StatusUnauthorized)
+				httputil.JSONError(w, "missing authorization", "missing_auth", http.StatusUnauthorized)
 				return
 			}
 
 			payload, err := verifier.Verify(r.Context(), token, googleClientID)
 			if err != nil {
 				slog.Debug("auth: invalid token", "err", err)
-				http.Error(w, `{"error":"invalid token"}`, http.StatusUnauthorized)
+				httputil.JSONError(w, "invalid token", "invalid_token", http.StatusUnauthorized)
 				return
 			}
 
 			u, err := getOrCreateUser(r.Context(), userStore, payload)
 			if err != nil {
 				slog.Error("auth: get or create user", "err", err)
-				http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+				httputil.JSONError(w, "internal error", "internal_error", http.StatusInternalServerError)
 				return
 			}
 

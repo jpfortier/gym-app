@@ -80,15 +80,24 @@ Standard Go layering: **Handler → Service → Repository**. No business logic 
 
 ```
 internal/
-├── ai/           # OpenAI client, whisper, parse, image, usage
-├── session/      # SessionService, session repo
-├── logentry/     # LogService, log repo (entries + sets)
-├── exercise/     # Exercise resolution, category/variant repos
-├── pr/           # PR detection, PR repo, image trigger
-├── query/        # QueryService (or under logentry if small)
-├── correction/   # CorrectionService
-├── handler/      # HTTP handlers (chat, sessions, exercises, prs, health)
-└── db/           # DB connection only; repos live in domain packages
+├── ai/             # OpenAI client, whisper, parse, image, usage
+├── auth/           # Google token verify, RequireAuth middleware
+├── chat/           # ChatService (orchestrates intents)
+├── chatmessages/   # Conversation history for context
+├── correction/     # CorrectionService
+├── db/             # DB connection, sqlutil
+├── env/            # GYM_* env vars
+├── exercise/       # Exercise resolution, category/variant repos
+├── logentry/       # LogService, log repo (entries + sets)
+├── notes/          # User notes repo
+├── pr/             # PR detection, PR repo, image trigger
+├── query/          # QueryService
+├── session/        # SessionService, session repo
+├── storage/        # R2
+├── usage/          # AI usage persistence
+├── user/           # User repo
+├── testutil/       # Shared test helpers
+└── handler/        # HTTP handlers
 ```
 
 ## Structure
