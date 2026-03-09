@@ -18,6 +18,9 @@ go.work
 # Env
 .env
 .env.local
+
+# TLS certs (private keys)
+certs/
 *.local
 
 # IDE

@@ -26,6 +26,12 @@ func Port() string {
 	return os.Getenv("PORT") // Fly sets this
 }
 
+// TLSCertFile returns the path to the TLS certificate file. When set with TLSKeyFile, server uses HTTPS.
+func TLSCertFile() string { return os.Getenv("GYM_TLS_CERT_FILE") }
+
+// TLSKeyFile returns the path to the TLS private key file. When set with TLSCertFile, server uses HTTPS.
+func TLSKeyFile() string { return os.Getenv("GYM_TLS_KEY_FILE") }
+
 func R2AccountID() string   { return os.Getenv("GYM_R2_ACCOUNT_ID") }
 func R2AccessKeyID() string { return os.Getenv("GYM_R2_ACCESS_KEY_ID") }
 func R2SecretAccessKey() string { return os.Getenv("GYM_R2_SECRET_ACCESS_KEY") }

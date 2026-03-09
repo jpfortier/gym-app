@@ -75,7 +75,9 @@ Migrations run automatically before each deploy via `release_command`. Requires 
 |-----|----------|---------|
 | `GYM_DATABASE_URL` | Yes | Postgres connection string |
 | `GYM_GOOGLE_CLIENT_ID` | Yes | OAuth2 client ID for Google Sign-In |
-| `GYM_PORT` | No | HTTP port (default 8081; Fly sets PORT) |
+| `GYM_PORT` | No | HTTP/HTTPS port (default 8081; Fly sets PORT) |
+| `GYM_TLS_CERT_FILE` | When HTTPS | Path to TLS cert. With TLS_KEY_FILE, server uses HTTPS. |
+| `GYM_TLS_KEY_FILE` | When HTTPS | Path to TLS key. With TLS_CERT_FILE, server uses HTTPS. |
 | `GYM_R2_ACCOUNT_ID` | When R2 | Cloudflare account ID |
 | `GYM_R2_ACCESS_KEY_ID` | When R2 | R2 API token |
 | `GYM_R2_SECRET_ACCESS_KEY` | When R2 | R2 API secret |
@@ -90,6 +92,8 @@ Migrations run automatically before each deploy via `release_command`. Requires 
 **AI throttling:** See `docs/ai-throttling.md`. Tests must never call real OpenAI. Set `GYM_OPENAI_TEST_MODE=true` in `.env` when running `make test`.
 
 Copy `.env.example` to `.env`. Unset optional vars are ignored; app works without R2/FCM/OpenAI until those features are used.
+
+**HTTPS (local):** Set `GYM_TLS_CERT_FILE` and `GYM_TLS_KEY_FILE` for HTTPS. Use mkcert: `mkcert -install && mkcert -cert-file certs/cert.pem -key-file certs/key.pem localhost 127.0.0.1 10.0.2.2` (10.0.2.2 = Android emulator host). Android emulator trusts mkcert roots when you run `mkcert -install`.
 
 ## Gotchas
 

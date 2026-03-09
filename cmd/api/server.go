@@ -99,6 +99,7 @@ func NewServer(ctx context.Context) (*Server, error) {
 }
 
 // Run starts the HTTP server. Blocks until error.
+// Uses HTTPS when GYM_TLS_CERT_FILE and GYM_TLS_KEY_FILE are both set.
 func (s *Server) Run() error {
 	defer s.db.Close()
 	port := env.Port()
@@ -106,6 +107,12 @@ func (s *Server) Run() error {
 		port = "8081"
 	}
 	addr := ":" + port
-	log.Printf("Listening on %s", addr)
+	certFile := env.TLSCertFile()
+	keyFile := env.TLSKeyFile()
+	if certFile != "" && keyFile != "" {
+		log.Printf("Listening on https://%s", addr)
+		return http.ListenAndServeTLS(addr, certFile, keyFile, s.mux)
+	}
+	log.Printf("Listening on http://%s", addr)
 	return http.ListenAndServe(addr, s.mux)
 }
