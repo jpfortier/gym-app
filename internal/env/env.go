@@ -47,6 +47,11 @@ func OpenAIRatePerMinute() int { return OpenAIEnvInt("GYM_OPENAI_RATE_PER_MINUTE
 func OpenAIDailyLimit() int    { return OpenAIEnvInt("GYM_OPENAI_DAILY_LIMIT", 100) }
 func OpenAIDalleDailyLimit() int { return OpenAIEnvInt("GYM_OPENAI_DALLE_DAILY_LIMIT", 5) }
 
+// DevMode enables dev token endpoint and Bearer dev:<email> auth. Never enable in production.
+func DevMode() bool {
+	return strings.ToLower(os.Getenv("GYM_DEV_MODE")) == "true"
+}
+
 func OpenAIEnvInt(key string, def int) int {
 	if s := os.Getenv(key); s != "" {
 		if n, err := strconv.Atoi(s); err == nil && n > 0 {

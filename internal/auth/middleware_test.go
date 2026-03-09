@@ -209,6 +209,13 @@ func (m *mockUserStore) GetByGoogleID(ctx context.Context, googleID string) (*us
 	return m.user, nil
 }
 
+func (m *mockUserStore) GetByEmail(ctx context.Context, email string) (*user.User, error) {
+	if m.user != nil && m.user.Email == email {
+		return m.user, nil
+	}
+	return nil, nil
+}
+
 func (m *mockUserStore) Create(ctx context.Context, u *user.User) error {
 	m.createCalled = true
 	if u.ID == uuid.Nil {

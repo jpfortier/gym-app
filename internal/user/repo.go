@@ -36,6 +36,27 @@ func (r *Repo) GetByGoogleID(ctx context.Context, googleID string) (*User, error
 	return &u, nil
 }
 
+func (r *Repo) GetByEmail(ctx context.Context, email string) (*User, error) {
+	var u User
+	var name, photoURL sql.NullString
+	var emailOut sql.NullString
+	err := r.db.QueryRowContext(ctx,
+		`SELECT id, google_id, email, name, photo_url, role, created_at
+		 FROM users WHERE email = $1`,
+		email,
+	).Scan(&u.ID, &u.GoogleID, &emailOut, &name, &photoURL, &u.Role, &u.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	u.Email = emailOut.String
+	u.Name = name.String
+	u.PhotoURL = photoURL.String
+	return &u, nil
+}
+
 func (r *Repo) Create(ctx context.Context, u *User) error {
 	db.EnsureV7(&u.ID)
 	return r.db.QueryRowContext(ctx,

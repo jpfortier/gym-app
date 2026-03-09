@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/jpfortier/gym-app/internal/env"
 	"github.com/jpfortier/gym-app/internal/httputil"
 	"github.com/jpfortier/gym-app/internal/user"
 	"google.golang.org/api/idtoken"
@@ -18,6 +19,7 @@ const userContextKey contextKey = 0
 // UserStore gets or creates users. Use *user.Repo in production.
 type UserStore interface {
 	GetByGoogleID(ctx context.Context, googleID string) (*user.User, error)
+	GetByEmail(ctx context.Context, email string) (*user.User, error)
 	Create(ctx context.Context, u *user.User) error
 }
 
@@ -42,6 +44,23 @@ func RequireAuth(verifier Verifier, userStore UserStore, googleClientID string) 
 			if token == "" {
 				slog.Debug("auth: missing bearer token")
 				httputil.JSONError(w, "missing authorization", "missing_auth", http.StatusUnauthorized)
+				return
+			}
+
+			if env.DevMode() && strings.HasPrefix(token, "dev:") {
+				email := strings.TrimSpace(strings.TrimPrefix(token, "dev:"))
+				if email == "" {
+					httputil.JSONError(w, "dev token requires email", "invalid_token", http.StatusUnauthorized)
+					return
+				}
+				u, err := getOrCreateDevUser(r.Context(), userStore, email)
+				if err != nil {
+					slog.Error("auth: dev user", "err", err)
+					httputil.JSONError(w, "internal error", "internal_error", http.StatusInternalServerError)
+					return
+				}
+				ctx := context.WithValue(r.Context(), userContextKey, u)
+				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
 
@@ -95,6 +114,25 @@ func getOrCreateUser(ctx context.Context, store UserStore, payload *idtoken.Payl
 		Email:   email,
 		Name:    name,
 		PhotoURL: picture,
+	}
+	if err := store.Create(ctx, u); err != nil {
+		return nil, err
+	}
+	return u, nil
+}
+
+func getOrCreateDevUser(ctx context.Context, store UserStore, email string) (*user.User, error) {
+	u, err := store.GetByEmail(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	if u != nil {
+		return u, nil
+	}
+	u = &user.User{
+		GoogleID: "dev-" + email,
+		Email:    email,
+		Name:     "",
 	}
 	if err := store.Create(ctx, u); err != nil {
 		return nil, err

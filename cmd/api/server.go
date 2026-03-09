@@ -38,6 +38,10 @@ func (s *userStoreWithWelcome) GetByGoogleID(ctx context.Context, googleID strin
 	return s.userRepo.GetByGoogleID(ctx, googleID)
 }
 
+func (s *userStoreWithWelcome) GetByEmail(ctx context.Context, email string) (*user.User, error) {
+	return s.userRepo.GetByEmail(ctx, email)
+}
+
 func (s *userStoreWithWelcome) Create(ctx context.Context, u *user.User) error {
 	if err := s.userRepo.Create(ctx, u); err != nil {
 		return err
@@ -107,6 +111,7 @@ func NewServer(ctx context.Context) (*Server, error) {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", handler.Health(database))
+	mux.HandleFunc("GET /dev/token", handler.DevToken)
 	mux.Handle("GET /me", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.Me)))
 	mux.Handle("GET /chat/messages", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.ChatMessages(chatMessagesRepo))))
 	mux.Handle("POST /chat", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.Chat(chatSvc))))
