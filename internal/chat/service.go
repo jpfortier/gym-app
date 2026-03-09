@@ -19,6 +19,7 @@ import (
 	"github.com/jpfortier/gym-app/internal/query"
 	"github.com/jpfortier/gym-app/internal/session"
 	"github.com/jpfortier/gym-app/internal/storage"
+	"github.com/jpfortier/gym-app/internal/workoutcontext"
 )
 
 // Response is the unified chat response.
@@ -28,6 +29,7 @@ type Response struct {
 	Entries  []LogResult   `json:"entries,omitempty"`
 	History  *HistoryResult `json:"history,omitempty"`
 	PRs      []PRResult    `json:"prs,omitempty"`
+	NeedsConfirmation bool   `json:"needs_confirmation,omitempty"`
 }
 
 type LogResult struct {
@@ -57,6 +59,7 @@ type Config struct {
 	Client           *ai.Client
 	Parser           ai.Parser
 	SessionSvc       *session.Service
+	SessionRepo      *session.Repo
 	LogentrySvc      *logentry.Service
 	LogentryRepo     *logentry.Repo
 	ExerciseSvc      *exercise.Service
@@ -85,24 +88,30 @@ type Service struct {
 	notesRepo        *notes.Repo
 	chatMessagesRepo *chatmessages.Repo
 	r2               *storage.R2
+	workoutCtxBuilder *workoutcontext.Builder
 }
 
 func NewService(cfg Config) *Service {
+	var wcBuilder *workoutcontext.Builder
+	if cfg.SessionRepo != nil && cfg.LogentryRepo != nil && cfg.ExerciseRepo != nil {
+		wcBuilder = workoutcontext.NewBuilder(cfg.SessionRepo, cfg.LogentryRepo, cfg.ExerciseRepo)
+	}
 	return &Service{
-		client:           cfg.Client,
-		parser:           cfg.Parser,
-		sessionSvc:       cfg.SessionSvc,
-		logentrySvc:      cfg.LogentrySvc,
-		logentryRepo:     cfg.LogentryRepo,
-		exerciseSvc:      cfg.ExerciseSvc,
-		exerciseRepo:     cfg.ExerciseRepo,
-		querySvc:         cfg.QuerySvc,
-		correctionSvc:    cfg.CorrectionSvc,
-		prSvc:            cfg.PrSvc,
-		prRepo:           cfg.PrRepo,
-		notesRepo:        cfg.NotesRepo,
-		chatMessagesRepo: cfg.ChatMessagesRepo,
-		r2:               cfg.R2,
+		client:            cfg.Client,
+		parser:            cfg.Parser,
+		sessionSvc:        cfg.SessionSvc,
+		logentrySvc:       cfg.LogentrySvc,
+		logentryRepo:      cfg.LogentryRepo,
+		exerciseSvc:       cfg.ExerciseSvc,
+		exerciseRepo:      cfg.ExerciseRepo,
+		querySvc:          cfg.QuerySvc,
+		correctionSvc:     cfg.CorrectionSvc,
+		prSvc:             cfg.PrSvc,
+		prRepo:            cfg.PrRepo,
+		notesRepo:         cfg.NotesRepo,
+		chatMessagesRepo:  cfg.ChatMessagesRepo,
+		r2:                cfg.R2,
+		workoutCtxBuilder: wcBuilder,
 	}
 }
 
@@ -120,9 +129,24 @@ func (s *Service) Process(ctx context.Context, userID uuid.UUID, text string, au
 		return &Response{Intent: "unknown", Message: "No input received."}, nil
 	}
 	recent := s.loadRecentMessages(ctx, userID)
-	intent, err := s.parser.Parse(ctx, userID, text, recent)
+	var workoutCtxStr string
+	if s.workoutCtxBuilder != nil {
+		if wc, err := s.workoutCtxBuilder.Build(ctx, userID); err == nil {
+			workoutCtxStr = wc.FormatForLLM()
+		}
+	}
+	intent, err := s.parser.Parse(ctx, userID, text, recent, workoutCtxStr)
 	if err != nil {
 		return nil, fmt.Errorf("parse: %w", err)
+	}
+	if s.requiresConfirmation(intent) {
+		msg := "I need a bit more detail to be sure."
+		if intent.UIText != nil && intent.UIText.Preview != "" {
+			msg = intent.UIText.Preview + " Can you clarify which one you mean?"
+		} else if len(intent.Ambiguities) > 0 {
+			msg = "I'm not sure which entry you mean. Can you be more specific?"
+		}
+		return &Response{Intent: intent.Intent, Message: msg, NeedsConfirmation: true}, nil
 	}
 	var resp *Response
 	var handleErr error
@@ -150,6 +174,18 @@ func (s *Service) Process(ctx context.Context, userID uuid.UUID, text string, au
 }
 
 const contextWindowSize = 6
+
+func (s *Service) requiresConfirmation(intent *ai.ParsedIntent) bool {
+	if intent == nil || len(intent.Ambiguities) == 0 {
+		return false
+	}
+	switch intent.Intent {
+	case "correction", "remove":
+		return true
+	default:
+		return false
+	}
+}
 
 func (s *Service) loadRecentMessages(ctx context.Context, userID uuid.UUID) []ai.ChatMessage {
 	if s.chatMessagesRepo == nil {

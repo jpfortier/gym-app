@@ -39,7 +39,7 @@ func TestChat_audioSamples(t *testing.T) {
 	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM workout_sessions WHERE user_id = $1", u.ID) })
 	t.Cleanup(func() { db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
-	chatSvc := chatTestService(t, db, nil)
+	chatSvc := chatTestService(t, db, nil, nil)
 
 	// Resolve samples path: go test runs from package dir (internal/handler), so go up to module root
 	samplesDir := filepath.Join("..", "..", "samples", "audio")

@@ -16,6 +16,35 @@
 
 V2: FCM, notifications, admin panel.
 
+## Architecture Backlog (from changes.md)
+
+Planned improvements to align with LLM + Rule Engine architecture. See `changes.md` for full detail.
+
+### Assumption Ledger + Ambiguity System (priority) — IMPLEMENTED
+
+LLM outputs `assumptions` and `ambiguities`. Code uses them to decide confirm vs execute.
+
+- **LLM outputs:** `ambiguities: []` (e.g. `["target_unclear", "multiple_targets"]`), `assumptions: []` (explicit vs inferred)
+- **Code rule:** `len(ambiguities) > 0` → require confirmation; otherwise → auto-execute
+- **Flow:** Extend ParsedIntent schema → update parse prompt → handler checks ambiguities before executing destructive/ambiguous actions
+
+**Done:** `internal/workoutcontext/` builds active session, recent sessions, ref objects, aliases. Chat service passes workout context to parser. ParsedIntent has Assumptions, Ambiguities, UIText. Parse prompt updated. When correction/remove has ambiguities, returns `needs_confirmation: true` and does not execute.
+
+### Other change suggestions
+
+| Area | Summary |
+|------|---------|
+| **Pipeline** | Build workout context before LLM, add validation layer, execution policy (confirm vs execute), audit logging |
+| **Workout context** | Send active session, recent sessions, reference objects (last set, last exercise), aliases, user_defaults to LLM — DONE |
+| **Command DSL** | APPEND_SET, UPDATE_SET with targetRef, DELETE_SET; incremental logging "bench" → "140 for 8" → "145 for 6" |
+| **Query DSL** | Metrics (max_weight, estimated_1rm, total_volume), scopes (most_recent, best, trend) |
+| **Validation** | Deterministic checks: target refs resolve, command valid, units valid; output resolvedTargets + issues |
+| **Confirmation policy** | Auto-execute: append/create, target unique. Confirm: delete, multiple targets, ambiguous |
+| **Scope expansion** | Fallback: active session → today → yesterday → last 7 days (code-owned, not LLM) |
+| **Error repair** | On TARGET_NOT_FOUND, try scope expansion; confirm if repair changes scope |
+| **Domain model** | Session: notes, location, tags. Sets: unit, rir, tempo, partially specified (reps nullable) |
+| **Success messages** | Generate from execution results: "Logged bench press — 140 lb for today." |
+
 ## Segments (V1)
 
 **Backend foundation**

@@ -65,6 +65,7 @@ func NewServer(ctx context.Context) (*Server, error) {
 		Client:           aiClient,
 		Parser:           parser,
 		SessionSvc:       sessionSvc,
+		SessionRepo:      sessionRepo,
 		LogentrySvc:      logentrySvc,
 		LogentryRepo:     logentryRepo,
 		ExerciseSvc:      exerciseSvc,

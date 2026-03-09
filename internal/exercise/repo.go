@@ -260,6 +260,36 @@ func (r *Repo) StoreAlias(ctx context.Context, userID uuid.UUID, aliasKey string
 	return err
 }
 
+// UserAlias maps alias_key to canonical exercise name (category + variant).
+type UserAlias struct {
+	AliasKey string
+	Canonical string
+}
+
+func (r *Repo) ListUserAliases(ctx context.Context, userID uuid.UUID) ([]UserAlias, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT uea.alias_key, ec.name || ' ' || ev.name
+		 FROM user_exercise_aliases uea
+		 JOIN exercise_variants ev ON ev.id = uea.variant_id
+		 JOIN exercise_categories ec ON ec.id = ev.category_id
+		 WHERE uea.user_id = $1`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []UserAlias
+	for rows.Next() {
+		var a UserAlias
+		if err := rows.Scan(&a.AliasKey, &a.Canonical); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
 func scanCategories(rows *sql.Rows) ([]*Category, error) {
 	var out []*Category
 	for rows.Next() {
