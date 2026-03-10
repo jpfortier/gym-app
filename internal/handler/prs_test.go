@@ -65,3 +65,199 @@ func TestPRsList_returnsUserPRs(t *testing.T) {
 		t.Errorf("got weight %v, want 225", out[0]["weight"])
 	}
 }
+
+func TestPRImage_returns404WhenImageNotReady(t *testing.T) {
+	db := dbForTest(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	userRepo := user.NewRepo(db)
+	u := &user.User{GoogleID: "primg-" + uuid.New().String(), Email: "primg@test.com", Name: "PRImg"}
+	if err := userRepo.Create(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+
+	var variantID uuid.UUID
+	if err := db.QueryRowContext(ctx, `SELECT id FROM exercise_variants WHERE user_id IS NULL LIMIT 1`).Scan(&variantID); err != nil {
+		t.Fatal(err)
+	}
+
+	prRepo := pr.NewRepo(db)
+	prRec := &pr.PersonalRecord{UserID: u.ID, ExerciseVariantID: variantID, PRType: "weight", Weight: 135}
+	if err := prRepo.Create(ctx, prRec); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM personal_records WHERE id = $1", prRec.ID) })
+
+	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
+	mux := http.NewServeMux()
+	mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(PRImage(prRepo, nil))))
+
+	req := httptest.NewRequest(http.MethodGet, "/prs/"+prRec.ID.String()+"/image", nil)
+	req.Header.Set("Authorization", "Bearer x")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("got status %d, want 404 (image not ready): %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPRImage_returns404WhenWrongUser(t *testing.T) {
+	db := dbForTest(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	userRepo := user.NewRepo(db)
+	u1 := &user.User{GoogleID: "primg-u1-" + uuid.New().String(), Email: "u1@test.com", Name: "U1"}
+	u2 := &user.User{GoogleID: "primg-u2-" + uuid.New().String(), Email: "u2@test.com", Name: "U2"}
+	for _, u := range []*user.User{u1, u2} {
+		if err := userRepo.Create(ctx, u); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	}
+
+	var variantID uuid.UUID
+	if err := db.QueryRowContext(ctx, `SELECT id FROM exercise_variants WHERE user_id IS NULL LIMIT 1`).Scan(&variantID); err != nil {
+		t.Fatal(err)
+	}
+
+	prRepo := pr.NewRepo(db)
+	prRec := &pr.PersonalRecord{UserID: u1.ID, ExerciseVariantID: variantID, PRType: "weight", Weight: 135}
+	if err := prRepo.Create(ctx, prRec); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM personal_records WHERE id = $1", prRec.ID) })
+	if err := prRepo.UpdateImageURL(ctx, prRec.ID, "pr/u1/"+prRec.ID.String()+".png"); err != nil {
+		t.Fatal(err)
+	}
+
+	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u2.GoogleID}}
+	mux := http.NewServeMux()
+	mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(PRImage(prRepo, nil))))
+
+	req := httptest.NewRequest(http.MethodGet, "/prs/"+prRec.ID.String()+"/image", nil)
+	req.Header.Set("Authorization", "Bearer x")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("got status %d, want 404 (wrong user): %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPRImage_returns404WhenNotFound(t *testing.T) {
+	db := dbForTest(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	userRepo := user.NewRepo(db)
+	u := &user.User{GoogleID: "primg-nf-" + uuid.New().String(), Email: "nf@test.com", Name: "NF"}
+	if err := userRepo.Create(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+
+	prRepo := pr.NewRepo(db)
+	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
+	mux := http.NewServeMux()
+	mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(PRImage(prRepo, nil))))
+
+	fakeID := uuid.New().String()
+	req := httptest.NewRequest(http.MethodGet, "/prs/"+fakeID+"/image", nil)
+	req.Header.Set("Authorization", "Bearer x")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("got status %d, want 404 (not found): %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPRImage_returns401WhenUnauthorized(t *testing.T) {
+	db := dbForTest(t)
+	defer db.Close()
+
+	userRepo := user.NewRepo(db)
+	prRepo := pr.NewRepo(db)
+	mux := http.NewServeMux()
+	mux.Handle("GET /prs/{id}/image", auth.RequireAuth(&mockVerifier{}, userRepo, "aud")(http.HandlerFunc(PRImage(prRepo, nil))))
+
+	req := httptest.NewRequest(http.MethodGet, "/prs/"+uuid.New().String()+"/image", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("got status %d, want 401 (missing auth): %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPRImage_returns400WhenInvalidID(t *testing.T) {
+	db := dbForTest(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	userRepo := user.NewRepo(db)
+	u := &user.User{GoogleID: "primg-inv-" + uuid.New().String(), Email: "inv@test.com", Name: "Inv"}
+	if err := userRepo.Create(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+
+	prRepo := pr.NewRepo(db)
+	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
+	mux := http.NewServeMux()
+	mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(PRImage(prRepo, nil))))
+
+	req := httptest.NewRequest(http.MethodGet, "/prs/not-a-uuid/image", nil)
+	req.Header.Set("Authorization", "Bearer x")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("got status %d, want 400: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPRImage_returns503WhenR2NotConfigured(t *testing.T) {
+	db := dbForTest(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	userRepo := user.NewRepo(db)
+	u := &user.User{GoogleID: "primg-r2-" + uuid.New().String(), Email: "r2@test.com", Name: "R2"}
+	if err := userRepo.Create(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+
+	var variantID uuid.UUID
+	if err := db.QueryRowContext(ctx, `SELECT id FROM exercise_variants WHERE user_id IS NULL LIMIT 1`).Scan(&variantID); err != nil {
+		t.Fatal(err)
+	}
+
+	prRepo := pr.NewRepo(db)
+	prRec := &pr.PersonalRecord{UserID: u.ID, ExerciseVariantID: variantID, PRType: "weight", Weight: 135}
+	if err := prRepo.Create(ctx, prRec); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM personal_records WHERE id = $1", prRec.ID) })
+	if err := prRepo.UpdateImageURL(ctx, prRec.ID, "pr/u/"+prRec.ID.String()+".png"); err != nil {
+		t.Fatal(err)
+	}
+
+	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
+	mux := http.NewServeMux()
+	mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(PRImage(prRepo, nil))))
+
+	req := httptest.NewRequest(http.MethodGet, "/prs/"+prRec.ID.String()+"/image", nil)
+	req.Header.Set("Authorization", "Bearer x")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("got status %d, want 503 (R2 not configured): %s", rec.Code, rec.Body.String())
+	}
+}

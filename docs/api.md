@@ -62,8 +62,9 @@ All log creation goes through POST /chat. No manual write endpoint. See `docs/an
 
 ## GET /prs/{id}/image
 
-- **Purpose:** Redirect to presigned URL for PR image. Returns 302.
+- **Purpose:** Redirect to presigned URL for PR image. Returns 302 when ready; 404 while DALL-E is still generating.
 - **Auth:** Required. PR must belong to user.
+- **Polling:** Client polls until 302 (image ready). Interval 3–5 s, timeout ~60 s. See `docs/android-api.md` for full flow.
 
 ## Error Responses
 

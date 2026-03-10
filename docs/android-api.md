@@ -344,16 +344,29 @@ Or with audio:
 
 **Auth:** Required
 
-**Purpose:** Redirect to presigned URL for PR image. Returns 302.
+**Purpose:** Redirect to presigned URL for PR image. Returns 302 when ready.
 
 **Path:** `id` = PR UUID
 
-**Response:** 302 redirect to R2 presigned URL (1 hour expiry)
+**Response codes:**
+| Code | Meaning |
+|------|---------|
+| 404 | Image not ready yet → keep polling |
+| 302 | Image ready → follow redirect to load the image |
 
-**Errors:**
-- 404 if PR not found, not owned by user, or image not ready
+**On 302:** Redirect goes to R2 presigned URL (valid 1 hour).
 
-**PR image flow:** DALL-E generates (~30 sec) after PR created. Poll GET /prs until `image_url` is set, or poll this endpoint. V2: FCM notification when ready.
+**Errors:** 404 if PR not found, not owned by user, or image not ready (DALL-E still generating).
+
+**Polling strategy:**
+- Endpoint: `GET /prs/{id}/image` (with auth)
+- Interval: 3–5 seconds
+- Timeout: ~60 seconds (DALL-E usually ~30 sec)
+- On 302: Follow redirect and load the image
+
+**Alternative:** Poll `GET /prs` and watch for the PR's `image_url` to become non-null, then call `GET /prs/{id}/image` once. Useful if already refreshing the PR list; otherwise polling the image endpoint is simpler.
+
+V2: FCM notification when ready (foreground = update UI; background/closed = system notification).
 
 ---
 

@@ -14,7 +14,7 @@ func DBForTest(t *testing.T) *sql.DB {
 	t.Helper()
 	connStr := env.DatabaseURL()
 	if connStr == "" {
-		connStr = "postgres://postgres:gym-dev-2025@localhost:15432/postgres?sslmode=disable"
+		connStr = "postgres://postgres:PASSWORD@prtracks.com:5432/postgres?sslmode=require"
 	}
 	db, err := sql.Open("pgx", connStr)
 	if err != nil {

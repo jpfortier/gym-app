@@ -3,10 +3,10 @@
 lint:
 	$(shell go env GOPATH)/bin/golangci-lint run
 
-# Run migrations. Start proxy: fly proxy 15432:5432 -a gym-app-pg
+# Run migrations. Start proxy: fly proxy 5432 -a gym-app-pg
 # Requires pgvector: enable in Fly dashboard (PostgreSQL Extensions) for migration 000008.
 # Uses .env if present. All gym env vars use GYM_ prefix to avoid collisions with other projects.
-# Or: GYM_DATABASE_URL="postgres://postgres:PASSWORD@localhost:15432/postgres?sslmode=disable" make migrate-up
+# Or: GYM_DATABASE_URL="postgres://postgres:PASSWORD@localhost:5432/postgres?sslmode=disable" make migrate-up
 MIGRATE := $(shell which migrate 2>/dev/null || echo "$(shell go env GOPATH)/bin/migrate")
 migrate-up:
 	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
