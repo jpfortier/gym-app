@@ -21,7 +21,7 @@ func TestRepo_Create_GetByID(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "session-test-" + uuid.New().String(), Email: "session@test.com", Name: "Session Test"}
+	u := &user.User{GoogleID: "session-test-" + uuid.New().String(), Email: "session-" + uuid.New().String() + "@test.com", Name: "Session Test"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestRepo_GetByUserAndDate(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "session-by-date-" + uuid.New().String(), Email: "by-date@test.com", Name: "By Date"}
+	u := &user.User{GoogleID: "session-by-date-" + uuid.New().String(), Email: "by-date-" + uuid.New().String() + "@test.com", Name: "By Date"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func TestRepo_GetByUserAndDate_notFound(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "session-nf-" + uuid.New().String(), Email: "nf@test.com", Name: "NF"}
+	u := &user.User{GoogleID: "session-nf-" + uuid.New().String(), Email: "nf-" + uuid.New().String() + "@test.com", Name: "NF"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestRepo_ListByUser(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "session-list-" + uuid.New().String(), Email: "list@test.com", Name: "List"}
+	u := &user.User{GoogleID: "session-list-" + uuid.New().String(), Email: "list-" + uuid.New().String() + "@test.com", Name: "List"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}

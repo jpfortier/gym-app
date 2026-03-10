@@ -1,0 +1,25 @@
+{{define "users"}}
+<h2>Users</h2>
+<table>
+  <thead>
+    <tr><th>Email</th><th>Name</th><th>Role</th><th>Created</th><th></th></tr>
+  </thead>
+  <tbody>
+    {{range index .Data "Users"}}
+    <tr>
+      <td>{{.Email}}</td>
+      <td>{{.Name}}</td>
+      <td>{{.Role}}</td>
+      <td>{{.CreatedAt.Format "2006-01-02"}}</td>
+      <td>
+        <form action="/admin/select-user" method="post" style="display: inline;">
+          <input type="hidden" name="user_id" value="{{.ID}}">
+          <input type="hidden" name="redirect" value="/admin">
+          <button type="submit">View as</button>
+        </form>
+      </td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{end}}

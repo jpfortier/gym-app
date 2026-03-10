@@ -22,7 +22,7 @@ func TestExercisesList_returnsCategoriesAndVariants(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "exercises-" + uuid.New().String(), Email: "ex@test.com", Name: "EX"}
+	u := &user.User{GoogleID: "exercises-" + uuid.New().String(), Email: "ex-" + uuid.New().String() + "@test.com", Name: "EX"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}

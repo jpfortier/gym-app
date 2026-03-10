@@ -82,7 +82,7 @@ All log creation goes through POST /chat. No manual write endpoint. See `docs/an
 
 When `GYM_DEV_MODE=true`:
 
-- **GET /dev/token** — Returns `{ "token": "dev:<email>" }`. Default email `test@datavysta.com`; override with `?email=...`. Returns 404 when dev mode is off.
+- **GET /dev/token** — Returns `{ "token": "dev:<email>" }`. Default email `test@example.com`; override with `?email=...`. Returns 404 when dev mode is off.
 - **Bearer dev:\<email\>** — Accepted by RequireAuth. User is looked up by email; if missing, created with `google_id = "dev-" + email`.
 
 Use for Playwright, integration tests, etc. Never enable `GYM_DEV_MODE` in production.

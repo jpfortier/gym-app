@@ -262,7 +262,7 @@ func (r *Repo) StoreAlias(ctx context.Context, userID uuid.UUID, aliasKey string
 
 // UserAlias maps alias_key to canonical exercise name (category + variant).
 type UserAlias struct {
-	AliasKey string
+	AliasKey  string
 	Canonical string
 }
 

@@ -140,7 +140,9 @@ func (s *Service) Process(ctx context.Context, u *user.User, text string, audioB
 	recent := s.loadRecentMessages(ctx, userID)
 	var workoutCtxStr string
 	if s.workoutCtxBuilder != nil {
-		if wc, err := s.workoutCtxBuilder.Build(ctx, userID); err == nil {
+		if wc, err := s.workoutCtxBuilder.Build(ctx, userID); err != nil {
+			slog.Warn("workout context build failed", "err", err)
+		} else {
 			workoutCtxStr = wc.FormatForLLM()
 		}
 	}
@@ -155,7 +157,9 @@ func (s *Service) Process(ctx context.Context, u *user.User, text string, audioB
 		} else if len(intent.Ambiguities) > 0 {
 			msg = "Not sure which one — can you be more specific?"
 		}
-		return &Response{Intent: intent.Intent, Message: msg, NeedsConfirmation: true}, nil
+		resp := &Response{Intent: intent.Intent, Message: msg, NeedsConfirmation: true}
+		s.appendMessages(ctx, userID, text, resp, intent)
+		return resp, nil
 	}
 	var resp *Response
 	var handleErr error
@@ -223,6 +227,9 @@ func (s *Service) appendMessages(ctx context.Context, userID uuid.UUID, userText
 }
 
 func buildAssistantSummary(r *Response, intent *ai.ParsedIntent) string {
+	if r.NeedsConfirmation {
+		return r.Message
+	}
 	switch r.Intent {
 	case "log":
 		if intent != nil && len(intent.Exercises) > 0 {

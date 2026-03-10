@@ -22,9 +22,12 @@ func DevToken(w http.ResponseWriter, r *http.Request) {
 	}
 	email := strings.TrimSpace(r.URL.Query().Get("email"))
 	if email == "" {
-		email = "test@datavysta.com"
+		email = "test@example.com"
 	}
 	token := "dev:" + email
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"token": token})
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"token":      token,
+		"build_date": env.BuildDate(),
+	})
 }

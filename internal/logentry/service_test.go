@@ -122,7 +122,7 @@ func TestService_CreateLogEntry_sessionAndLogEntryIntegration(t *testing.T) {
 func createLogEntryTestUser(t *testing.T, db *sql.DB, ctx context.Context) *user.User {
 	t.Helper()
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "logsvc-" + uuid.New().String(), Email: "logsvc@test.com", Name: "Log Svc"}
+	u := &user.User{GoogleID: "logsvc-" + uuid.New().String(), Email: "logsvc-" + uuid.New().String() + "@test.com", Name: "Log Svc"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}

@@ -1,0 +1,27 @@
+{{define "usage"}}
+{{if .SelectedUser}}
+<h2>AI Usage — {{.SelectedUser.Email}}</h2>
+{{$usage := index .Data "Usage"}}
+{{if $usage}}
+<table>
+  <thead>
+    <tr><th>Model</th><th>Prompt</th><th>Completion</th><th>Cost (¢)</th></tr>
+  </thead>
+  <tbody>
+    {{range $usage}}
+    <tr>
+      <td>{{.Model}}</td>
+      <td>{{.PromptTokens}}</td>
+      <td>{{.CompletionTokens}}</td>
+      <td>{{.CostCents}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{else}}
+<p>No usage records.</p>
+{{end}}
+{{else}}
+<p>Pick a user from the dropdown above to view their AI usage.</p>
+{{end}}
+{{end}}

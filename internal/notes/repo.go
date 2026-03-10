@@ -40,3 +40,31 @@ func (r *Repo) Create(ctx context.Context, userID uuid.UUID, categoryID, variant
 	}
 	return n, nil
 }
+
+// ListByUser returns notes for a user, ordered by created_at DESC. limit defaults to 100.
+func (r *Repo) ListByUser(ctx context.Context, userID uuid.UUID, limit int) ([]*Note, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, user_id, exercise_category_id, exercise_variant_id, content, created_at
+		 FROM notes WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`,
+		userID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*Note
+	for rows.Next() {
+		var n Note
+		var catID, varID sql.NullString
+		if err := rows.Scan(&n.ID, &n.UserID, &catID, &varID, &n.Content, &n.CreatedAt); err != nil {
+			return nil, err
+		}
+		n.ExerciseCategoryID = db.NullStringToUUIDPtr(catID)
+		n.ExerciseVariantID = db.NullStringToUUIDPtr(varID)
+		out = append(out, &n)
+	}
+	return out, rows.Err()
+}

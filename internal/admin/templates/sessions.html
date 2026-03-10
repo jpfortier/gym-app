@@ -1,0 +1,25 @@
+{{define "sessions"}}
+{{if .SelectedUser}}
+<h2>Sessions — {{.SelectedUser.Email}}</h2>
+{{$sessions := index .Data "Sessions"}}
+{{if $sessions}}
+<table>
+  <thead>
+    <tr><th>Date</th><th>Created</th></tr>
+  </thead>
+  <tbody>
+    {{range $sessions}}
+    <tr>
+      <td><a href="/admin/sessions/{{.ID}}">{{.Date.Format "2006-01-02"}}</a></td>
+      <td>{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{else}}
+<p>No sessions.</p>
+{{end}}
+{{else}}
+<p>Pick a user from the dropdown above to view their sessions.</p>
+{{end}}
+{{end}}

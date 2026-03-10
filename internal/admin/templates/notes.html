@@ -1,0 +1,25 @@
+{{define "notes"}}
+{{if .SelectedUser}}
+<h2>Notes — {{.SelectedUser.Email}}</h2>
+{{$notes := index .Data "Notes"}}
+{{if $notes}}
+<table>
+  <thead>
+    <tr><th>Content</th><th>Created</th></tr>
+  </thead>
+  <tbody>
+    {{range $notes}}
+    <tr>
+      <td>{{.Content}}</td>
+      <td>{{.CreatedAt}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{else}}
+<p>No notes.</p>
+{{end}}
+{{else}}
+<p>Pick a user from the dropdown above to view their notes.</p>
+{{end}}
+{{end}}

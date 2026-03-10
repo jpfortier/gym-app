@@ -19,7 +19,7 @@ func dbForTest(t *testing.T) *sql.DB { return testutil.DBForTest(t) }
 func seedSessionAndVariant(t *testing.T, db *sql.DB, ctx context.Context) (sessID, variantID uuid.UUID) {
 	t.Helper()
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "logentry-" + uuid.New().String(), Email: "le@test.com", Name: "LE"}
+	u := &user.User{GoogleID: "logentry-" + uuid.New().String(), Email: "le-" + uuid.New().String() + "@test.com", Name: "LE"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}

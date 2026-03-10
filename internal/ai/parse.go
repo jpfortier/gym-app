@@ -156,7 +156,14 @@ func (p *parserImpl) parseMock(text string, userName string) (*ParsedIntent, err
 		return &ParsedIntent{Intent: "query", Category: "bench press", Variant: "standard"}, nil
 	}
 	if strings.Contains(text, "change") || strings.Contains(text, "correct") || strings.Contains(text, "wrong") {
-		return &ParsedIntent{Intent: "correction", TargetRef: "last", Changes: &ParsedCorrection{Weight: ptrFloat(150)}}, nil
+		return &ParsedIntent{
+			Intent:      "correction",
+			TargetRef:   "last",
+			Changes:     &ParsedCorrection{Weight: ptrFloat(150)},
+			Assumptions: []Assumption{{Kind: "target_inferred", Value: "last_created_set"}},
+			Ambiguities: []string{},
+			UIText:      &ParsedUIText{Preview: "Update your last bench set to 150 lb."},
+		}, nil
 	}
 	if strings.Contains(text, "remember") || (strings.Contains(text, "note") && strings.Contains(text, "for")) {
 		return &ParsedIntent{Intent: "note", Category: "deadlift", Variant: "rdl", NoteContent: "warm up hamstrings first"}, nil
@@ -168,9 +175,23 @@ func (p *parserImpl) parseMock(text string, userName string) (*ParsedIntent, err
 	if strings.Contains(text, "forget") || strings.Contains(text, "remove") || strings.Contains(text, "delete") ||
 		strings.Contains(text, "undo") || strings.Contains(text, "scratch") {
 		if strings.Contains(text, "bench") {
-			return &ParsedIntent{Intent: "remove", Category: "bench press", Variant: "standard", TargetRef: "last"}, nil
+			return &ParsedIntent{
+				Intent:      "remove",
+				Category:    "bench press",
+				Variant:     "standard",
+				TargetRef:   "last",
+				Assumptions: []Assumption{{Kind: "target_inferred", Value: "last_created_set"}},
+				Ambiguities: []string{},
+				UIText:      &ParsedUIText{Preview: "Remove the last bench entry."},
+			}, nil
 		}
-		return &ParsedIntent{Intent: "remove", TargetRef: "that"}, nil
+		return &ParsedIntent{
+			Intent:      "remove",
+			TargetRef:   "that",
+			Assumptions: []Assumption{{Kind: "target_inferred", Value: "last_created_set"}},
+			Ambiguities: []string{"target_unclear"},
+			UIText:      &ParsedUIText{Preview: "Remove the last entry."},
+		}, nil
 	}
 	w := 135.0
 	return &ParsedIntent{

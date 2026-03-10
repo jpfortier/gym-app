@@ -182,6 +182,60 @@ func TestRequireAuth_validToken_createsNewUser(t *testing.T) {
 	}
 }
 
+func TestRequireAuth_validToken_reusesUserByEmail(t *testing.T) {
+	existingUser := &user.User{
+		ID:        uuid.MustParse("b2c3d4e5-f6a7-4b5c-9d0e-1f2a3b4c5d6e"),
+		GoogleID:  "google-old",
+		Email:     "reuse@example.com",
+		Name:      "Old Name",
+		CreatedAt: time.Now(),
+	}
+	store := &mockUserStore{}
+	store.getByGoogleIDUser = nil
+	store.getByEmailUser = existingUser
+
+	verifier := &mockVerifier{
+		payload: &idtoken.Payload{
+			Subject: "google-new",
+			Claims: map[string]interface{}{
+				"email":   "reuse@example.com",
+				"name":   "New Name",
+				"picture": "https://example.com/new.jpg",
+			},
+		},
+	}
+	var capturedUser *user.User
+	handler := RequireAuth(verifier, store, "test-client-id")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedUser = UserFromContext(r.Context())
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/me", nil)
+	req.Header.Set("Authorization", "Bearer valid-token")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("got status %d, want 200", rec.Code)
+	}
+	if capturedUser == nil {
+		t.Fatal("user should be in context")
+	}
+	if capturedUser.ID != existingUser.ID {
+		t.Errorf("got user id %s, want %s (reuse same user)", capturedUser.ID, existingUser.ID)
+	}
+	if capturedUser.GoogleID != "google-new" {
+		t.Errorf("got google_id %q, want google-new (updated)", capturedUser.GoogleID)
+	}
+	if capturedUser.Email != "reuse@example.com" {
+		t.Errorf("got email %q, want reuse@example.com", capturedUser.Email)
+	}
+	if store.createCalled {
+		t.Error("Create should not be called when reusing by email")
+	}
+}
+
 var errInvalidToken = context.DeadlineExceeded
 
 type mockVerifier struct {
@@ -200,16 +254,24 @@ func (m *mockVerifier) Verify(ctx context.Context, token, audience string) (*idt
 
 type mockUserStore struct {
 	user               *user.User
+	getByGoogleIDUser  *user.User
+	getByEmailUser     *user.User
 	getByGoogleIDCalled bool
-	createCalled        bool
+	createCalled       bool
 }
 
 func (m *mockUserStore) GetByGoogleID(ctx context.Context, googleID string) (*user.User, error) {
 	m.getByGoogleIDCalled = true
+	if m.getByGoogleIDUser != nil {
+		return m.getByGoogleIDUser, nil
+	}
 	return m.user, nil
 }
 
 func (m *mockUserStore) GetByEmail(ctx context.Context, email string) (*user.User, error) {
+	if m.getByEmailUser != nil && m.getByEmailUser.Email == email {
+		return m.getByEmailUser, nil
+	}
 	if m.user != nil && m.user.Email == email {
 		return m.user, nil
 	}
@@ -224,5 +286,9 @@ func (m *mockUserStore) Create(ctx context.Context, u *user.User) error {
 	if u.CreatedAt.IsZero() {
 		u.CreatedAt = time.Now()
 	}
+	return nil
+}
+
+func (m *mockUserStore) UpdateGoogleID(ctx context.Context, userID uuid.UUID, googleID string) error {
 	return nil
 }

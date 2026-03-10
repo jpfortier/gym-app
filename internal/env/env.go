@@ -52,6 +52,17 @@ func DevMode() bool {
 	return strings.ToLower(os.Getenv("GYM_DEV_MODE")) == "true"
 }
 
+// buildDate is set at build time via -ldflags "-X ...buildDate=..."
+var buildDate string
+
+// BuildDate returns the build timestamp. Empty when built with go run (no ldflags).
+func BuildDate() string {
+	if buildDate == "" {
+		return "dev"
+	}
+	return buildDate
+}
+
 func OpenAIEnvInt(key string, def int) int {
 	if s := os.Getenv(key); s != "" {
 		if n, err := strconv.Atoi(s); err == nil && n > 0 {

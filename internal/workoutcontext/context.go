@@ -3,6 +3,7 @@ package workoutcontext
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -13,6 +14,13 @@ import (
 	"github.com/jpfortier/gym-app/internal/logentry"
 	"github.com/jpfortier/gym-app/internal/session"
 )
+
+func sanitizeForYAML(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.ReplaceAll(s, "\r", " ")
+	return s
+}
 
 // WorkoutContext is the structured context sent to the LLM for interpretation.
 type WorkoutContext struct {
@@ -74,6 +82,8 @@ type Builder struct {
 	exerciseRepo *exercise.Repo
 }
 
+const recentSessionsLimit = 8
+
 func NewBuilder(sessionRepo *session.Repo, logentryRepo *logentry.Repo, exerciseRepo *exercise.Repo) *Builder {
 	return &Builder{
 		sessionRepo:  sessionRepo,
@@ -104,11 +114,12 @@ func (b *Builder) Build(ctx context.Context, userID uuid.UUID) (*WorkoutContext,
 		wc.ExerciseAliases[a.AliasKey] = a.Canonical
 	}
 
-	sessions, err := b.sessionRepo.ListByUser(ctx, userID, 8)
+	sessions, err := b.sessionRepo.ListByUser(ctx, userID, recentSessionsLimit)
 	if err != nil {
 		return nil, fmt.Errorf("list sessions: %w", err)
 	}
 
+	// lastSetID: from today's session; if today empty, fall back to most recent session.
 	var lastSetID string
 	var lastExerciseName string
 	var lastSessionDate string
@@ -157,7 +168,7 @@ func (b *Builder) Build(ctx context.Context, userID uuid.UUID) (*WorkoutContext,
 				re := RecentExercise{Name: exName, Sets: nil}
 				for _, set := range e.Sets {
 					re.Sets = append(re.Sets, RecentSet{Weight: set.Weight, Reps: set.Reps})
-					if lastSetID == "" && i < 2 {
+					if lastSetID == "" && i == 0 {
 						lastSetID = set.ID.String()
 					}
 				}
@@ -165,6 +176,7 @@ func (b *Builder) Build(ctx context.Context, userID uuid.UUID) (*WorkoutContext,
 			}
 		}
 
+		// lastSessionDate: prefer today or yesterday when present; else use most recent session.
 		if lastSessionDate == "" && (dateStr == today || dateStr == yesterday) {
 			lastSessionDate = dateStr
 		}
@@ -191,9 +203,9 @@ func (wc *WorkoutContext) FormatForLLM() string {
 	var b strings.Builder
 	b.WriteString("today: " + wc.Today + "\n\n")
 	b.WriteString("REFERENCE_OBJECTS:\n")
-	b.WriteString("  last_created_set: " + wc.RefObjects.LastCreatedSet + "\n")
-	b.WriteString("  last_exercise: " + wc.RefObjects.LastExercise + "\n")
-	b.WriteString("  last_session: " + wc.RefObjects.LastSession + "\n\n")
+	b.WriteString("  last_created_set: " + sanitizeForYAML(wc.RefObjects.LastCreatedSet) + "\n")
+	b.WriteString("  last_exercise: " + sanitizeForYAML(wc.RefObjects.LastExercise) + "\n")
+	b.WriteString("  last_session: " + sanitizeForYAML(wc.RefObjects.LastSession) + "\n\n")
 
 	if wc.ActiveSession != nil {
 		b.WriteString("active_session:\n")
@@ -202,7 +214,7 @@ func (wc *WorkoutContext) FormatForLLM() string {
 		b.WriteString("  exercises:\n")
 		for _, ex := range wc.ActiveSession.Exercises {
 			b.WriteString("    - id: " + ex.ID + "\n")
-			b.WriteString("      name: " + ex.Name + "\n")
+			b.WriteString("      name: " + sanitizeForYAML(ex.Name) + "\n")
 			b.WriteString("      sets:\n")
 			for _, s := range ex.Sets {
 				b.WriteString("        - id: " + s.ID + "\n")
@@ -221,7 +233,7 @@ func (wc *WorkoutContext) FormatForLLM() string {
 			b.WriteString("  - date: " + rs.Date + "\n")
 			b.WriteString("    exercises:\n")
 			for _, ex := range rs.Exercises {
-				b.WriteString("      - name: " + ex.Name + "\n")
+				b.WriteString("      - name: " + sanitizeForYAML(ex.Name) + "\n")
 				b.WriteString("        sets:\n")
 				for _, s := range ex.Sets {
 					b.WriteString("          - weight: ")
@@ -239,8 +251,14 @@ func (wc *WorkoutContext) FormatForLLM() string {
 
 	if len(wc.ExerciseAliases) > 0 {
 		b.WriteString("exercise_aliases:\n")
-		for k, v := range wc.ExerciseAliases {
-			b.WriteString("  " + k + " -> " + v + "\n")
+		keys := make([]string, 0, len(wc.ExerciseAliases))
+		for k := range wc.ExerciseAliases {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			v := wc.ExerciseAliases[k]
+			b.WriteString("  " + sanitizeForYAML(k) + " -> " + sanitizeForYAML(v) + "\n")
 		}
 		b.WriteString("\n")
 	}

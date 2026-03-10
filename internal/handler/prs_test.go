@@ -22,7 +22,7 @@ func TestPRsList_returnsUserPRs(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "prs-" + uuid.New().String(), Email: "pr@test.com", Name: "PR"}
+	u := &user.User{GoogleID: "prs-" + uuid.New().String(), Email: "pr-" + uuid.New().String() + "@test.com", Name: "PR"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestPRImage_returns404WhenImageNotReady(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "primg-" + uuid.New().String(), Email: "primg@test.com", Name: "PRImg"}
+	u := &user.User{GoogleID: "primg-" + uuid.New().String(), Email: "primg-" + uuid.New().String() + "@test.com", Name: "PRImg"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
@@ -110,8 +110,8 @@ func TestPRImage_returns404WhenWrongUser(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u1 := &user.User{GoogleID: "primg-u1-" + uuid.New().String(), Email: "u1@test.com", Name: "U1"}
-	u2 := &user.User{GoogleID: "primg-u2-" + uuid.New().String(), Email: "u2@test.com", Name: "U2"}
+	u1 := &user.User{GoogleID: "primg-u1-" + uuid.New().String(), Email: "u1-" + uuid.New().String() + "@test.com", Name: "U1"}
+	u2 := &user.User{GoogleID: "primg-u2-" + uuid.New().String(), Email: "u2-" + uuid.New().String() + "@test.com", Name: "U2"}
 	for _, u := range []*user.User{u1, u2} {
 		if err := userRepo.Create(ctx, u); err != nil {
 			t.Fatal(err)
@@ -154,7 +154,7 @@ func TestPRImage_returns404WhenNotFound(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "primg-nf-" + uuid.New().String(), Email: "nf@test.com", Name: "NF"}
+	u := &user.User{GoogleID: "primg-nf-" + uuid.New().String(), Email: "nf-" + uuid.New().String() + "@test.com", Name: "NF"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +200,7 @@ func TestPRImage_returns400WhenInvalidID(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "primg-inv-" + uuid.New().String(), Email: "inv@test.com", Name: "Inv"}
+	u := &user.User{GoogleID: "primg-inv-" + uuid.New().String(), Email: "inv-" + uuid.New().String() + "@test.com", Name: "Inv"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +227,7 @@ func TestPRImage_returns503WhenR2NotConfigured(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "primg-r2-" + uuid.New().String(), Email: "r2@test.com", Name: "R2"}
+	u := &user.User{GoogleID: "primg-r2-" + uuid.New().String(), Email: "r2-" + uuid.New().String() + "@test.com", Name: "R2"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}

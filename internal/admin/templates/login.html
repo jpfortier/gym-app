@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Login</title>
+</head>
+<body>
+  <h1>Admin Login</h1>
+  <p>Paste your auth token (from Google Sign-In or dev token) to access the admin panel.</p>
+  <form action="/admin/login" method="post">
+    <label>Token: <input type="text" name="token" size="80" required></label>
+    <button type="submit">Login</button>
+  </form>
+  <p>In dev mode: <a href="/dev/token" target="_blank">Get dev token</a></p>
+  <p style="color:#888;font-size:0.9em">Build: {{.BuildDate}}</p>
+</body>
+</html>

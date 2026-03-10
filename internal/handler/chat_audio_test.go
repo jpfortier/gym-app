@@ -31,7 +31,7 @@ func TestChat_audioSamples(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "audio-" + uuid.New().String(), Email: "audio@test.com", Name: "Audio"}
+	u := &user.User{GoogleID: "audio-" + uuid.New().String(), Email: "audio-" + uuid.New().String() + "@test.com", Name: "Audio"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}

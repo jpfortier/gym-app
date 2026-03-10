@@ -1,0 +1,34 @@
+{{define "dashboard"}}
+{{if .RequiresUser}}
+{{if not .SelectedUser}}
+<p>Pick a user from the dropdown above to view their data.</p>
+{{else}}
+<h2>Dashboard — {{.SelectedUser.Email}}</h2>
+{{$sessions := index .Data "Sessions"}}
+{{$prs := index .Data "PRs"}}
+<p>Sessions: {{len $sessions}} | PRs: {{len $prs}}</p>
+<h3>Recent Sessions</h3>
+{{if $sessions}}
+<ul>
+  {{range $sessions}}
+  <li><a href="/admin/sessions/{{.ID}}">{{.Date.Format "2006-01-02"}}</a></li>
+  {{end}}
+</ul>
+{{else}}
+<p>No sessions.</p>
+{{end}}
+<h3>PRs</h3>
+{{if $prs}}
+<ul>
+  {{range $prs}}
+  <li>{{.Weight}} lb × {{.Reps}} reps ({{.PRType}})</li>
+  {{end}}
+</ul>
+{{else}}
+<p>No PRs.</p>
+{{end}}
+{{end}}
+{{else}}
+<p>Pick a user to inspect.</p>
+{{end}}
+{{end}}

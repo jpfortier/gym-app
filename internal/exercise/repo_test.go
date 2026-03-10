@@ -20,7 +20,7 @@ func TestRepo_Resolve_seededGlobal(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "ex-" + uuid.New().String(), Email: "ex@test.com", Name: "Ex"}
+	u := &user.User{GoogleID: "ex-" + uuid.New().String(), Email: "ex-" + uuid.New().String() + "@test.com", Name: "Ex"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +145,7 @@ func TestRepo_StoreAlias_FindVariantByAlias(t *testing.T) {
 func createExerciseTestUser(t *testing.T, db *sql.DB, ctx context.Context) *user.User {
 	t.Helper()
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "ex-" + uuid.New().String(), Email: "ex@test.com", Name: "Ex"}
+	u := &user.User{GoogleID: "ex-" + uuid.New().String(), Email: "ex-" + uuid.New().String() + "@test.com", Name: "Ex"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}

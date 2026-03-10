@@ -71,7 +71,7 @@ func TestChat_logIntent(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "chat-" + uuid.New().String(), Email: "c@test.com", Name: "C"}
+	u := &user.User{GoogleID: "chat-" + uuid.New().String(), Email: "c-" + uuid.New().String() + "@test.com", Name: "C"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestChat_removeIntent(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "chat-rm-" + uuid.New().String(), Email: "rm@test.com", Name: "RM"}
+	u := &user.User{GoogleID: "chat-rm-" + uuid.New().String(), Email: "rm-" + uuid.New().String() + "@test.com", Name: "RM"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestChat_removeIntent(t *testing.T) {
 		t.Fatalf("log: got status %d: %s", rec.Code, rec.Body.String())
 	}
 
-	body, _ = json.Marshal(map[string]string{"text": "forget that"})
+	body, _ = json.Marshal(map[string]string{"text": "forget that bench"})
 	req = httptest.NewRequest(http.MethodPost, "/chat", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer x")
 	req.Header.Set("Content-Type", "application/json")
@@ -145,7 +145,7 @@ func TestChat_removeIntent(t *testing.T) {
 		t.Errorf("got message %v, want Scratched.", out["message"])
 	}
 
-	body, _ = json.Marshal(map[string]string{"text": "oh sorry bring that back"})
+	body, _ = json.Marshal(map[string]string{"text": "oh sorry bring that bench back"})
 	req = httptest.NewRequest(http.MethodPost, "/chat", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer x")
 	req.Header.Set("Content-Type", "application/json")
@@ -173,7 +173,7 @@ func TestChat_contextStoresMessages(t *testing.T) {
 
 	userRepo := user.NewRepo(db)
 	chatMessagesRepo := chatmessages.NewRepo(db)
-	u := &user.User{GoogleID: "chat-ctx-" + uuid.New().String(), Email: "ctx@test.com", Name: "Ctx"}
+	u := &user.User{GoogleID: "chat-ctx-" + uuid.New().String(), Email: "ctx-" + uuid.New().String() + "@test.com", Name: "Ctx"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +217,7 @@ func TestChat_needsConfirmationWhenAmbiguous(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "chat-ambig-" + uuid.New().String(), Email: "ambig@test.com", Name: "A"}
+	u := &user.User{GoogleID: "chat-ambig-" + uuid.New().String(), Email: "ambig-" + uuid.New().String() + "@test.com", Name: "A"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +267,7 @@ func TestChat_setName(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "name-" + uuid.New().String(), Email: "name@test.com", Name: ""}
+	u := &user.User{GoogleID: "name-" + uuid.New().String(), Email: "name-" + uuid.New().String() + "@test.com", Name: ""}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
@@ -328,7 +328,7 @@ func TestChat_logAndQuerySamplesFromAudio(t *testing.T) {
 			ctx := context.Background()
 
 			userRepo := user.NewRepo(db)
-			u := &user.User{GoogleID: "samples-" + uuid.New().String(), Email: "samples@test.com", Name: "S"}
+			u := &user.User{GoogleID: "samples-" + uuid.New().String(), Email: "samples-" + uuid.New().String() + "@test.com", Name: "S"}
 			if err := userRepo.Create(ctx, u); err != nil {
 				t.Fatal(err)
 			}

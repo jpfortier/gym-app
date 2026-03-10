@@ -99,3 +99,28 @@ func (r *Repo) Append(ctx context.Context, userID uuid.UUID, role, content strin
 	)
 	return err
 }
+
+// ListByUser returns messages for a user, newest first. limit defaults to 50.
+func (r *Repo) ListByUser(ctx context.Context, userID uuid.UUID, limit int) ([]Message, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, user_id, role, content, created_at
+		 FROM chat_messages WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`,
+		userID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Message
+	for rows.Next() {
+		var m Message
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}

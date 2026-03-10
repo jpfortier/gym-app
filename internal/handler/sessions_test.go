@@ -29,7 +29,7 @@ func TestSessionsList_returnsUserSessions(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "sessions-list-" + uuid.New().String(), Email: "sl@test.com", Name: "SL"}
+	u := &user.User{GoogleID: "sessions-list-" + uuid.New().String(), Email: "sl-" + uuid.New().String() + "@test.com", Name: "SL"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestSessionDetail_otherUserReturns404(t *testing.T) {
 func createSessionsTestUser(t *testing.T, db *sql.DB, ctx context.Context) *user.User {
 	t.Helper()
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "sessions-" + uuid.New().String(), Email: "s@test.com", Name: "S"}
+	u := &user.User{GoogleID: "sessions-" + uuid.New().String(), Email: "s-" + uuid.New().String() + "@test.com", Name: "S"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}

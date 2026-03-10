@@ -25,7 +25,7 @@ func TestQueryHistory_returnsEntries(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "query-" + uuid.New().String(), Email: "q@test.com", Name: "Q"}
+	u := &user.User{GoogleID: "query-" + uuid.New().String(), Email: "q-" + uuid.New().String() + "@test.com", Name: "Q"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func TestQueryHistory_missingCategoryReturns400(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "query-400-" + uuid.New().String(), Email: "q4@test.com", Name: "Q4"}
+	u := &user.User{GoogleID: "query-400-" + uuid.New().String(), Email: "q4-" + uuid.New().String() + "@test.com", Name: "Q4"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}

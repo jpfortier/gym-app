@@ -1,12 +1,15 @@
-.PHONY: migrate-up migrate-down migrate-create schema-dump verify-openai test lint
+.PHONY: migrate-up migrate-down migrate-create schema-dump verify-openai test lint run build
+
+# Build date for run/build. Injects into /dev/token and admin login page.
+BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS := -ldflags "-X github.com/jpfortier/gym-app/internal/env.buildDate=$(BUILD_DATE)"
 
 lint:
 	$(shell go env GOPATH)/bin/golangci-lint run
 
-# Run migrations. Start proxy: fly proxy 5432 -a gym-app-pg
+# Run migrations. Start proxy first: fly proxy 15432:5432 -a gym-app-pg
 # Requires pgvector: enable in Fly dashboard (PostgreSQL Extensions) for migration 000008.
 # Uses .env if present. All gym env vars use GYM_ prefix to avoid collisions with other projects.
-# Or: GYM_DATABASE_URL="postgres://postgres:PASSWORD@localhost:5432/postgres?sslmode=disable" make migrate-up
 MIGRATE := $(shell which migrate 2>/dev/null || echo "$(shell go env GOPATH)/bin/migrate")
 migrate-up:
 	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
@@ -27,6 +30,15 @@ schema-dump:
 test:
 	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
 	go test ./... -count=1
+
+# Run API server. Uses .env. Injects build date for /dev/token and admin login.
+run:
+	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
+	go run $(LDFLAGS) ./cmd/api
+
+# Build API binary with build date.
+build:
+	go build $(LDFLAGS) -o gym-api ./cmd/api
 
 # Verify OpenAI API key. Create at https://platform.openai.com/api-keys
 verify-openai:

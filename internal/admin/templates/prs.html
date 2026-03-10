@@ -1,0 +1,28 @@
+{{define "prs"}}
+{{if .SelectedUser}}
+<h2>Personal Records — {{.SelectedUser.Email}}</h2>
+{{$prs := index .Data "PRs"}}
+{{if $prs}}
+<table>
+  <thead>
+    <tr><th>Exercise</th><th>Type</th><th>Weight</th><th>Reps</th><th>Created</th></tr>
+  </thead>
+  <tbody>
+    {{range $prs}}
+    <tr>
+      <td>{{.CategoryName}} / {{.VariantName}}</td>
+      <td>{{.PR.PRType}}</td>
+      <td>{{.PR.Weight}}</td>
+      <td>{{if .PR.Reps}}{{.PR.Reps}}{{else}}—{{end}}</td>
+      <td>{{.PR.CreatedAt.Format "2006-01-02"}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{else}}
+<p>No PRs.</p>
+{{end}}
+{{else}}
+<p>Pick a user from the dropdown above to view their PRs.</p>
+{{end}}
+{{end}}

@@ -106,7 +106,7 @@ func TestService_GetOrCreateForDate_invalidDate(t *testing.T) {
 func createTestUser(t *testing.T, db *sql.DB, ctx context.Context) *user.User {
 	t.Helper()
 	repo := user.NewRepo(db)
-	u := &user.User{GoogleID: "svc-test-" + uuid.New().String(), Email: "svc@test.com", Name: "Svc Test"}
+	u := &user.User{GoogleID: "svc-test-" + uuid.New().String(), Email: "svc-" + uuid.New().String() + "@test.com", Name: "Svc Test"}
 	if err := repo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}

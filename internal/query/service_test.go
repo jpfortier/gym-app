@@ -24,7 +24,7 @@ func TestService_History_returnsEntries(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "query-svc-" + uuid.New().String(), Email: "qs@test.com", Name: "QS"}
+	u := &user.User{GoogleID: "query-svc-" + uuid.New().String(), Email: "qs-" + uuid.New().String() + "@test.com", Name: "QS"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func TestService_History_notFoundReturnsNil(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	u := &user.User{GoogleID: "query-nf-" + uuid.New().String(), Email: "qn@test.com", Name: "QN"}
+	u := &user.User{GoogleID: "query-nf-" + uuid.New().String(), Email: "qn-" + uuid.New().String() + "@test.com", Name: "QN"}
 	userRepo := user.NewRepo(db)
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)

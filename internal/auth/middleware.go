@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jpfortier/gym-app/internal/env"
 	"github.com/jpfortier/gym-app/internal/httputil"
 	"github.com/jpfortier/gym-app/internal/user"
@@ -21,6 +22,7 @@ type UserStore interface {
 	GetByGoogleID(ctx context.Context, googleID string) (*user.User, error)
 	GetByEmail(ctx context.Context, email string) (*user.User, error)
 	Create(ctx context.Context, u *user.User) error
+	UpdateGoogleID(ctx context.Context, userID uuid.UUID, googleID string) error
 }
 
 // UserFromContext returns the authenticated user from the request context.
@@ -109,10 +111,28 @@ func getOrCreateUser(ctx context.Context, store UserStore, payload *idtoken.Payl
 	name, _ := payload.Claims["name"].(string)
 	picture, _ := payload.Claims["picture"].(string)
 
+	u, err = store.GetByEmail(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	if u != nil {
+		if err := store.UpdateGoogleID(ctx, u.ID, payload.Subject); err != nil {
+			return nil, err
+		}
+		u.GoogleID = payload.Subject
+		if name != "" {
+			u.Name = name
+		}
+		if picture != "" {
+			u.PhotoURL = picture
+		}
+		return u, nil
+	}
+
 	u = &user.User{
 		GoogleID: payload.Subject,
-		Email:   email,
-		Name:    name,
+		Email:    email,
+		Name:     name,
 		PhotoURL: picture,
 	}
 	if err := store.Create(ctx, u); err != nil {

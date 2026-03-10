@@ -59,9 +59,13 @@ Migrations run automatically before each deploy via `release_command`. Requires 
 
 ## Local DB setup
 
-1. Copy `.env.example` to `.env` and set `GYM_DATABASE_URL` with your prod DB credentials (e.g. `postgres://postgres:PASSWORD@prtracks.com:5432/postgres?sslmode=require`)
-2. Or, for Fly proxy: `fly proxy 5432 -a gym-app-pg` and use `postgres://postgres:PASSWORD@localhost:5432/postgres?sslmode=disable`
+Fly Postgres does not accept direct connections from outside Fly (prtracks.com rejects connections). Use the Fly proxy for local dev:
+
+1. Start the proxy: `fly proxy 15432:5432 -a gym-app-pg` (port 15432 avoids conflicts with local Postgres on 5432)
+2. Copy `.env.example` to `.env` and set `GYM_DATABASE_URL=postgres://postgres:PASSWORD@localhost:15432/postgres?sslmode=disable`
 3. Run migrations: `make migrate-up` (or `migrate -path migrations -database $GYM_DATABASE_URL up`)
+
+Keep the proxy running in a terminal while developing. Stop with Ctrl+C.
 
 **Migrate CLI:** Install with postgres driver: `go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest`. Ensure `$(go env GOPATH)/bin` is in PATH.
 
@@ -101,7 +105,7 @@ Copy `.env.example` to `.env`. Unset optional vars are ignored; app works withou
 
 - **GYM_GOOGLE_CLIENT_ID:** Required for auth. OAuth2 client ID from Google Cloud Console (Android or Web client).
 - **Fly Postgres connection:** Use `/postgres` in URL for default DB: `...@host:port/postgres?sslmode=disable`
-- **DBeaver:** Connect to `prtracks.com:5432` (or run `fly proxy 5432 -a gym-app-pg` for localhost:5432)
+- **DBeaver:** Run `fly proxy 15432:5432 -a gym-app-pg`, then connect to `localhost:15432`
 
 ## Deferred
 

@@ -1,0 +1,28 @@
+{{define "session_detail"}}
+{{$session := index .Data "Session"}}
+{{$entries := index .Data "Entries"}}
+<h2>Session {{$session.Date.Format "2006-01-02"}}</h2>
+<p><a href="/admin/sessions">← Back to sessions</a></p>
+{{if $entries}}
+<table>
+  <thead>
+    <tr><th>Exercise</th><th>Raw</th><th>Sets</th></tr>
+  </thead>
+  <tbody>
+    {{range $entries}}
+    <tr>
+      <td>{{.CategoryName}} / {{.VariantName}}</td>
+      <td>{{.Entry.RawSpeech}}</td>
+      <td>
+        {{range .Entry.Sets}}
+        {{with .Weight}}{{.}}{{else}}—{{end}}×{{.Reps}}{{if .SetType}} ({{.SetType}}){{end}}
+        {{end}}
+      </td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{else}}
+<p>No entries.</p>
+{{end}}
+{{end}}
