@@ -27,7 +27,7 @@ import (
 	"github.com/jpfortier/gym-app/internal/user"
 )
 
-const welcomeMessage = "Welcome to the app. What's your name?"
+const welcomeMessage = "Yo! What should I call you?"
 
 type userStoreWithWelcome struct {
 	userRepo         *user.Repo

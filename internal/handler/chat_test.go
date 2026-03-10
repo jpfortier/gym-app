@@ -141,8 +141,8 @@ func TestChat_removeIntent(t *testing.T) {
 	if out["intent"] != "remove" {
 		t.Errorf("got intent %v, want remove", out["intent"])
 	}
-	if out["message"] != "Removed." {
-		t.Errorf("got message %v, want Removed.", out["message"])
+	if out["message"] != "Scratched." {
+		t.Errorf("got message %v, want Scratched.", out["message"])
 	}
 
 	body, _ = json.Marshal(map[string]string{"text": "oh sorry bring that back"})
@@ -161,8 +161,8 @@ func TestChat_removeIntent(t *testing.T) {
 	if out["intent"] != "restore" {
 		t.Errorf("got intent %v, want restore", out["intent"])
 	}
-	if out["message"] != "Brought back." {
-		t.Errorf("got message %v, want Brought back.", out["message"])
+	if out["message"] != "Back in." {
+		t.Errorf("got message %v, want Back in.", out["message"])
 	}
 }
 

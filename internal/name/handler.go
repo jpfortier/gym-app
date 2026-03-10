@@ -28,7 +28,7 @@ func (h *Handler) Process(ctx context.Context, userID uuid.UUID, rawName string,
 		return "", "What should I call you?", nil
 	}
 	if isRename {
-		return rawName, fmt.Sprintf("Name updated to %s.", rawName), nil
+		return rawName, fmt.Sprintf("%s it is. Let's go.", rawName), nil
 	}
 	displayName, err := h.twistOrSubstitute(ctx, userID, rawName)
 	if err != nil {

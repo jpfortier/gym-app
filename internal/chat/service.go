@@ -135,7 +135,7 @@ func (s *Service) Process(ctx context.Context, u *user.User, text string, audioB
 		}
 	}
 	if strings.TrimSpace(text) == "" {
-		return &Response{Intent: "unknown", Message: "No input received."}, nil
+		return &Response{Intent: "unknown", Message: "Didn't catch that — try again?"}, nil
 	}
 	recent := s.loadRecentMessages(ctx, userID)
 	var workoutCtxStr string
@@ -149,11 +149,11 @@ func (s *Service) Process(ctx context.Context, u *user.User, text string, audioB
 		return nil, fmt.Errorf("parse: %w", err)
 	}
 	if s.requiresConfirmation(intent) {
-		msg := "I need a bit more detail to be sure."
+		msg := "Need a bit more to go on."
 		if intent.UIText != nil && intent.UIText.Preview != "" {
-			msg = intent.UIText.Preview + " Can you clarify which one you mean?"
+			msg = intent.UIText.Preview + " Which one you mean?"
 		} else if len(intent.Ambiguities) > 0 {
-			msg = "I'm not sure which entry you mean. Can you be more specific?"
+			msg = "Not sure which one — can you be more specific?"
 		}
 		return &Response{Intent: intent.Intent, Message: msg, NeedsConfirmation: true}, nil
 	}
@@ -175,7 +175,7 @@ func (s *Service) Process(ctx context.Context, u *user.User, text string, audioB
 	case "set_name", "update_name":
 		resp, handleErr = s.handleName(ctx, u, intent)
 	default:
-		resp = &Response{Intent: "unknown", Message: "I didn't understand. Try logging a workout, asking about your history, correcting a previous entry, or removing something."}
+		resp = &Response{Intent: "unknown", Message: "Hmm, didn't catch that. Try logging a workout, asking about your history, or fixing something you logged."}
 	}
 	if handleErr != nil {
 		return nil, handleErr
@@ -233,10 +233,14 @@ func buildAssistantSummary(r *Response, intent *ai.ParsedIntent) string {
 					name += " " + strings.ToLower(ex.VariantName)
 				}
 				for _, set := range ex.Sets {
+					reps := set.Reps
+					if reps == 0 && set.Weight != nil {
+						reps = 1
+					}
 					if set.Weight != nil {
-						parts = append(parts, fmt.Sprintf("%s %.0f×%d", name, *set.Weight, set.Reps))
+						parts = append(parts, fmt.Sprintf("%s %.0f×%d", name, *set.Weight, reps))
 					} else {
-						parts = append(parts, fmt.Sprintf("%s %d reps", name, set.Reps))
+						parts = append(parts, fmt.Sprintf("%s %d reps", name, reps))
 					}
 				}
 			}
@@ -256,15 +260,15 @@ func buildAssistantSummary(r *Response, intent *ai.ParsedIntent) string {
 		if r.History != nil && r.History.ExerciseName != "" {
 			return fmt.Sprintf("Here's your %s %s history.", r.History.ExerciseName, r.History.VariantName)
 		}
-		return "No history found."
+		return "Nothing logged for that yet."
 	case "correction":
-		return "Corrected."
+		return "Fixed."
 	case "remove":
-		return "Removed."
+		return "Scratched."
 	case "restore":
-		return "Brought back."
+		return "Back in."
 	case "note":
-		return "Noted."
+		return "Locked in."
 	case "set_name", "update_name":
 		return r.Message
 	default:
@@ -293,7 +297,11 @@ func (s *Service) handleLog(ctx context.Context, userID uuid.UUID, intent *ai.Pa
 			if so == 0 {
 				so = i + 1
 			}
-			sets[i] = logentry.SetInput{Weight: ps.Weight, Reps: ps.Reps, SetOrder: so, SetType: ps.SetType}
+			reps := ps.Reps
+			if reps == 0 && ps.Weight != nil {
+				reps = 1
+			}
+			sets[i] = logentry.SetInput{Weight: ps.Weight, Reps: reps, SetOrder: so, SetType: ps.SetType}
 		}
 		entry, err := s.logentrySvc.CreateLogEntry(ctx, userID, date, variant.ID, ex.RawSpeech, ex.Notes, sets)
 		if err != nil {
@@ -319,9 +327,9 @@ func (s *Service) handleLog(ctx context.Context, userID uuid.UUID, intent *ai.Pa
 		}
 		results = append(results, LogResult{ExerciseName: catName, VariantName: variant.Name, SessionDate: date, EntryID: entry.ID.String()})
 	}
-	msg := "Logged."
+	msg := "Got it, that's in."
 	if len(allPRs) > 0 {
-		msg = fmt.Sprintf("Logged. %d new PR(s)!", len(allPRs))
+		msg = fmt.Sprintf("Logged. %d new PR(s)! Let's go.", len(allPRs))
 	}
 	return &Response{Intent: "log", Message: msg, Entries: results, PRs: allPRs}, nil
 }
@@ -340,7 +348,7 @@ func (s *Service) handleQuery(ctx context.Context, userID uuid.UUID, intent *ai.
 		return nil, err
 	}
 	if v == nil {
-		return &Response{Intent: "query", History: &HistoryResult{ExerciseName: "", VariantName: "", Entries: []interface{}{}}}, nil
+		return &Response{Intent: "query", Message: "Nothing logged for that yet.", History: &HistoryResult{ExerciseName: "", VariantName: "", Entries: []interface{}{}}}, nil
 	}
 	catObj, _ := s.exerciseRepo.GetCategoryByID(ctx, v.CategoryID)
 	catName := ""
@@ -360,8 +368,13 @@ func (s *Service) handleQuery(ctx context.Context, userID uuid.UUID, intent *ai.
 			"created_at":   e.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 	}
+	msg := "Nothing logged for that yet."
+	if len(entries) > 0 {
+		msg = fmt.Sprintf("Here's your %s %s history.", catName, v.Name)
+	}
 	return &Response{
 		Intent:  "query",
+		Message: msg,
 		History: &HistoryResult{ExerciseName: catName, VariantName: v.Name, Entries: out},
 	}, nil
 }
@@ -375,18 +388,18 @@ func (s *Service) handleRemove(ctx context.Context, userID uuid.UUID, intent *ai
 	if intent.Category != "" && intent.Variant != "" {
 		v, err := s.exerciseRepo.Resolve(ctx, userID, intent.Category, intent.Variant)
 		if err != nil || v == nil {
-			return &Response{Intent: "remove", Message: "Couldn't find that exercise."}, nil
+			return &Response{Intent: "remove", Message: "Couldn't find that one."}, nil
 		}
 		entries, err := s.logentryRepo.ListByUserAndVariantWithDateRange(ctx, userID, v.ID, date, date, 1)
 		if err != nil || len(entries) == 0 {
-			return &Response{Intent: "remove", Message: "No matching entry found to remove."}, nil
+			return &Response{Intent: "remove", Message: "Nothing to scratch there."}, nil
 		}
 		entry = entries[0]
 	} else {
 		var err error
 		entry, err = s.logentryRepo.GetMostRecentEntryForUser(ctx, userID, date)
 		if err != nil || entry == nil {
-			return &Response{Intent: "remove", Message: "No entry found to remove."}, nil
+			return &Response{Intent: "remove", Message: "Nothing to scratch."}, nil
 		}
 	}
 	ok, err := s.logentryRepo.DisableEntry(ctx, entry.ID, userID)
@@ -394,9 +407,9 @@ func (s *Service) handleRemove(ctx context.Context, userID uuid.UUID, intent *ai
 		return nil, err
 	}
 	if !ok {
-		return &Response{Intent: "remove", Message: "Couldn't remove that entry."}, nil
+		return &Response{Intent: "remove", Message: "Couldn't scratch that."}, nil
 	}
-	return &Response{Intent: "remove", Message: "Removed."}, nil
+	return &Response{Intent: "remove", Message: "Scratched."}, nil
 }
 
 func (s *Service) handleRestore(ctx context.Context, userID uuid.UUID, intent *ai.ParsedIntent) (*Response, error) {
@@ -413,15 +426,15 @@ func (s *Service) handleRestore(ctx context.Context, userID uuid.UUID, intent *a
 		return nil, err
 	}
 	if !ok {
-		return &Response{Intent: "restore", Message: "Couldn't restore that entry."}, nil
+		return &Response{Intent: "restore", Message: "Couldn't bring it back."}, nil
 	}
-	return &Response{Intent: "restore", Message: "Brought back."}, nil
+	return &Response{Intent: "restore", Message: "Back in."}, nil
 }
 
 func (s *Service) handleNote(ctx context.Context, userID uuid.UUID, intent *ai.ParsedIntent) (*Response, error) {
 	content := strings.TrimSpace(intent.NoteContent)
 	if content == "" {
-		return &Response{Intent: "note", Message: "What should I remember?"}, nil
+		return &Response{Intent: "note", Message: "What should I lock in?"}, nil
 	}
 	var categoryID, variantID *uuid.UUID
 	if intent.Category != "" && intent.Variant != "" {
@@ -429,7 +442,7 @@ func (s *Service) handleNote(ctx context.Context, userID uuid.UUID, intent *ai.P
 		if err != nil || v == nil {
 			v, err = s.exerciseSvc.ResolveOrCreate(ctx, userID, intent.Category, intent.Variant)
 			if err != nil || v == nil {
-				return &Response{Intent: "note", Message: "Couldn't find that exercise."}, nil
+				return &Response{Intent: "note", Message: "Couldn't find that one."}, nil
 			}
 		}
 		cat, _ := s.exerciseRepo.GetCategoryByID(ctx, v.CategoryID)
@@ -442,7 +455,7 @@ func (s *Service) handleNote(ctx context.Context, userID uuid.UUID, intent *ai.P
 	if err != nil {
 		return nil, err
 	}
-	return &Response{Intent: "note", Message: "Noted."}, nil
+	return &Response{Intent: "note", Message: "Locked in."}, nil
 }
 
 func (s *Service) handleName(ctx context.Context, u *user.User, intent *ai.ParsedIntent) (*Response, error) {
@@ -476,7 +489,7 @@ func (s *Service) handleCorrection(ctx context.Context, userID uuid.UUID, intent
 	if err := s.correctionSvc.Apply(ctx, userID, cat, variant, intent.Changes); err != nil {
 		return nil, err
 	}
-	return &Response{Intent: "correction", Message: "Corrected."}, nil
+	return &Response{Intent: "correction", Message: "Fixed."}, nil
 }
 
 func (s *Service) generateAndUploadPRImage(ctx context.Context, userID uuid.UUID, p *pr.PersonalRecord, exerciseName string) {

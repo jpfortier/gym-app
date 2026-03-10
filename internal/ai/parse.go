@@ -85,6 +85,7 @@ Rules:
 - exercise_name: use common names (Bench Press, Deadlift, Squat, etc). Lowercase for category in query.
 - variant_name: "standard" unless user specifies.
 - sets: weight in lbs, reps as int. set_order 1,2,3... set_type optional.
+- When user says only weight (e.g. "150 pounds", "for 150", "bench 150") without reps, use reps=1 (single rep).
 - For bodyweight: omit weight or null.
 - date: always YYYY-MM-DD. Infer "today" as {{.Today}}, "yesterday" as {{.Yesterday}}.
 - Output ONLY valid JSON, no markdown, no explanation.
