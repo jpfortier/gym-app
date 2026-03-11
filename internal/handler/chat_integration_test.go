@@ -21,6 +21,7 @@ import (
 	"github.com/jpfortier/gym-app/internal/env"
 	"github.com/jpfortier/gym-app/internal/exercise"
 	"github.com/jpfortier/gym-app/internal/logentry"
+	"github.com/jpfortier/gym-app/internal/pr"
 	"github.com/jpfortier/gym-app/internal/session"
 	"github.com/jpfortier/gym-app/internal/user"
 )
@@ -179,6 +180,52 @@ func TestChat_realLLM_manual(t *testing.T) {
 				t.Logf("  PR: %s %s %s %.0fx%s", cat, v, prType, w, repsStr)
 			}
 			prRows.Close()
+		}
+	})
+
+	// 0b. Text: two rack pulls — second is PR, triggers gpt-image-1.5 Edit API with reference images.
+	// Requires GYM_PR_IMAGE_REF_1, GYM_PR_IMAGE_REF_2 and R2 configured for image_url to be set.
+	t.Run("0b_text_pr_image_generation", func(t *testing.T) {
+		code, out := postChat("", "rack pull 200 for 5")
+		if code != http.StatusOK {
+			t.Fatalf("first log: got status %d: %v", code, out)
+		}
+		entries, _ := out["entries"].([]interface{})
+		if len(entries) == 0 {
+			t.Fatalf("first log: expected entries, got %d. message=%q", len(entries), out["message"])
+		}
+
+		code, out = postChat("", "rack pull 370 for 5")
+		if code != http.StatusOK {
+			t.Fatalf("second log: got status %d: %v", code, out)
+		}
+		prs, _ := out["prs"].([]interface{})
+		if len(prs) < 1 {
+			t.Fatalf("second log: expected >=1 PR, got %d. message=%q", len(prs), out["message"])
+		}
+		t.Logf("prs=%d ✓", len(prs))
+
+		refIDs := env.PRImageRefFileIDs()
+		if len(refIDs) > 0 {
+			prRepo := pr.NewRepo(db)
+			list, err := prRepo.ListByUser(ctx, u.ID)
+			if err != nil {
+				t.Fatalf("list PRs: %v", err)
+			}
+			var foundWithImage int
+			for _, p := range list {
+				if p.ImageURL != "" {
+					foundWithImage++
+					t.Logf("PR %s has image_url=%s", p.ID, p.ImageURL)
+				}
+			}
+			if foundWithImage == 0 {
+				t.Logf("no PRs with image_url yet (R2 may be unconfigured or image gen failed)")
+			} else {
+				t.Logf("PR image generation: %d PR(s) with image_url ✓", foundWithImage)
+			}
+		} else {
+			t.Logf("GYM_PR_IMAGE_REF_1/2 not set, skipping image_url check")
 		}
 	})
 

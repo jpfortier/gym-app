@@ -44,6 +44,19 @@ func R2Bucket() string      { return os.Getenv("GYM_R2_BUCKET") }
 func FCMCredentialsPath() string { return os.Getenv("GYM_FCM_CREDENTIALS_PATH") }
 
 func OpenAIAPIKey() string { return os.Getenv("GYM_OPENAI_API_KEY") }
+
+// PRImageRefFileIDs returns file IDs for PR image reference images (character sheet + context).
+// Upload once via Files API, then set GYM_PR_IMAGE_REF_1 and GYM_PR_IMAGE_REF_2.
+func PRImageRefFileIDs() []string {
+	var ids []string
+	if id := os.Getenv("GYM_PR_IMAGE_REF_1"); id != "" {
+		ids = append(ids, id)
+	}
+	if id := os.Getenv("GYM_PR_IMAGE_REF_2"); id != "" {
+		ids = append(ids, id)
+	}
+	return ids
+}
 func OpenAITestMode() bool {
 	return strings.ToLower(os.Getenv("GYM_OPENAI_TEST_MODE")) == "true"
 }
