@@ -1,4 +1,4 @@
-.PHONY: migrate-up migrate-down migrate-create schema-dump verify-openai test lint run build
+.PHONY: migrate-up migrate-down migrate-create schema-dump verify-openai test test-real-llm lint run build
 
 # Build date for run/build. Injects into /dev/token and admin login page.
 BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -39,6 +39,12 @@ run:
 # Build API binary with build date.
 build:
 	go build $(LDFLAGS) -o gym-api ./cmd/api
+
+# Run real LLM integration test (Whisper + GPT-4o + DALL-E). Requires GYM_OPENAI_API_KEY,
+# GYM_OPENAI_TEST_MODE=false, and optionally GYM_R2_* for PR images.
+test-real-llm:
+	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
+	GYM_OPENAI_TEST_MODE=false go test -v -count=1 ./internal/handler -run TestChat_realLLM_manual
 
 # Verify OpenAI API key. Create at https://platform.openai.com/api-keys
 verify-openai:

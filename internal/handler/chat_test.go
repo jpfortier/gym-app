@@ -27,6 +27,7 @@ import (
 	"github.com/jpfortier/gym-app/internal/pr"
 	"github.com/jpfortier/gym-app/internal/query"
 	"github.com/jpfortier/gym-app/internal/session"
+	"github.com/jpfortier/gym-app/internal/storage"
 	"github.com/jpfortier/gym-app/internal/user"
 )
 
@@ -64,6 +65,48 @@ func chatTestService(t *testing.T, db *sql.DB, chatMessagesRepo *chatmessages.Re
 func chatTestServer(t *testing.T, db *sql.DB, u *user.User, chatMessagesRepo *chatmessages.Repo) *http.ServeMux {
 	t.Helper()
 	chatSvc := chatTestService(t, db, chatMessagesRepo)
+	userRepo := user.NewRepo(db)
+	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
+	mux := http.NewServeMux()
+	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(Chat(chatSvc))))
+	return mux
+}
+
+// chatTestServiceWithR2 builds the chat service with real AI and R2 (when configured). For integration tests.
+func chatTestServiceWithR2(t *testing.T, db *sql.DB, chatMessagesRepo *chatmessages.Repo) *chat.Service {
+	t.Helper()
+	throttle := ai.NewThrottlerFromEnv()
+	aiClient := ai.NewClient(throttle, nil)
+	sessionRepo := session.NewRepo(db)
+	logentryRepo := logentry.NewRepo(db)
+	exerciseRepo := exercise.NewRepo(db)
+	exerciseSvc := exercise.NewService(exerciseRepo, aiClient)
+	prRepo := pr.NewRepo(db)
+	sessionSvc := session.NewService(sessionRepo)
+	logentrySvc := logentry.NewService(logentryRepo, sessionSvc)
+	querySvc := query.NewService(exerciseRepo, logentryRepo, sessionRepo)
+	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
+	prSvc := pr.NewService(prRepo)
+	notesRepo := notes.NewRepo(db)
+	cmdExecutor := command.NewExecutor(
+		sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo,
+		user.NewRepo(db), name.NewHandler(aiClient), notesRepo, prSvc,
+	)
+	r2, _ := storage.NewR2()
+	return chat.NewService(chat.Config{
+		Client: aiClient, UserRepo: user.NewRepo(db), NameHandler: name.NewHandler(aiClient),
+		SessionSvc: sessionSvc, SessionRepo: sessionRepo,
+		LogentrySvc: logentrySvc, LogentryRepo: logentryRepo,
+		ExerciseSvc: exerciseSvc, ExerciseRepo: exerciseRepo, QuerySvc: querySvc, CorrectionSvc: correctionSvc,
+		PrSvc: prSvc, PrRepo: prRepo, NotesRepo: notesRepo, ChatMessagesRepo: chatMessagesRepo, R2: r2,
+		CommandExecutor: cmdExecutor,
+	})
+}
+
+// chatTestServerWithR2 sets up POST /chat with real AI and R2. For integration tests.
+func chatTestServerWithR2(t *testing.T, db *sql.DB, u *user.User, chatMessagesRepo *chatmessages.Repo) *http.ServeMux {
+	t.Helper()
+	chatSvc := chatTestServiceWithR2(t, db, chatMessagesRepo)
 	userRepo := user.NewRepo(db)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
@@ -268,7 +311,7 @@ func TestChat_setName(t *testing.T) {
 
 	mux := chatTestServer(t, db, u, nil)
 
-	body, _ := json.Marshal(map[string]string{"text": "Peter"})
+	body, _ := json.Marshal(map[string]string{"text": "Brandon"})
 	req := httptest.NewRequest(http.MethodPost, "/chat", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer x")
 	req.Header.Set("Content-Type", "application/json")
@@ -289,8 +332,8 @@ func TestChat_setName(t *testing.T) {
 	if msg == "" {
 		t.Error("expected message")
 	}
-	// Mock twist: Peter -> Pete
-	if !strings.Contains(msg, "Pete") && !strings.Contains(msg, "Peter") {
+	// Mock twist: Brandon -> Brando
+	if !strings.Contains(msg, "Brando") && !strings.Contains(msg, "Brandon") {
 		t.Errorf("message should mention name: %q", msg)
 	}
 	// Verify user name was updated

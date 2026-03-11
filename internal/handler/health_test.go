@@ -2,6 +2,7 @@ package handler
 
 import (
 	"database/sql"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -24,8 +25,15 @@ func TestHealth_ok(t *testing.T) {
 	if got := rec.Header().Get("Content-Type"); got != "application/json" {
 		t.Errorf("got Content-Type %q, want application/json", got)
 	}
-	if body := rec.Body.String(); body != `{"status":"ok"}`+"\n" {
-		t.Errorf("got body %q", rec.Body.String())
+	var out map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out["status"] != "ok" {
+		t.Errorf("got status %q, want ok", out["status"])
+	}
+	if out["version"] == "" {
+		t.Error("expected version in response")
 	}
 }
 

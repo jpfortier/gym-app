@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+
+	"github.com/jpfortier/gym-app/internal/env"
 )
 
 func Health(db *sql.DB) http.HandlerFunc {
@@ -14,6 +16,6 @@ func Health(db *sql.DB) http.HandlerFunc {
 			_ = json.NewEncoder(w).Encode(map[string]string{"status": "unhealthy", "error": "database"})
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "version": env.BuildDate()})
 	}
 }

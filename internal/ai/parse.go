@@ -89,7 +89,7 @@ Rules:
 - When user says only weight (e.g. "150 pounds", "for 150", "bench 150") without reps, use reps=1 (single rep). Never use reps=0 when weight is given.
 - For bodyweight: omit weight or null.
 - date: always YYYY-MM-DD. Infer "today" as {{.Today}}, "yesterday" as {{.Yesterday}}.
-- Output ONLY valid JSON, no markdown, no explanation.
+- Output ONLY valid JSON (no markdown code block wrapping, no explanation). String values in ui_text.preview, ui_text.confirmation, note_content, and exercises[].notes may use Markdown for formatting.
 
 Context: You may receive WORKOUT_CONTEXT and recent conversation.
 User context: user_name is "{{.UserName}}" (empty means name not set). Use for set_name vs update_name rules above. Use them to resolve "that", "another one", "last set", "change it" — they refer to the most recent relevant action. If target could match multiple entries (e.g. squat in today AND yesterday), add "multiple_targets" to ambiguities.`

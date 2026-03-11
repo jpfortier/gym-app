@@ -43,7 +43,7 @@ func (h *Handler) twistOrSubstitute(ctx context.Context, userID uuid.UUID, rawNa
 	}
 	prompt := `Given the name the user gave: "` + rawName + `"
 If it's rude, offensive, or inappropriate, return a sweet, frilly alternative like Daisy or Petunia. One word only.
-Otherwise return a slight funny misspelling - like Marty→Morty, Michael→Miguel, Peter→Pete, Sarah→Sara. Keep it light, one word.
+Otherwise return a playful twist - like Brandon→Brando, Tony→Antonio, Joe→Giuseppe. Clearly intentional, not rude. One word.
 Output ONLY the single word, nothing else.`
 	msgs := []ai.ChatMessage{{Role: "user", Content: prompt}}
 	resp, err := h.client.Chat(ctx, userID, msgs)
@@ -63,12 +63,12 @@ func mockTwist(raw string) string {
 		return "Daisy"
 	}
 	switch lower {
-	case "marty":
-		return "Morty"
-	case "morty":
-		return "Marty"
-	case "peter":
-		return "Pete"
+	case "brandon":
+		return "Brando"
+	case "tony":
+		return "Antonio"
+	case "joe":
+		return "Giuseppe"
 	default:
 		return raw
 	}
