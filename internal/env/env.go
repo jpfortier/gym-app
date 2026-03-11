@@ -12,7 +12,11 @@ func DatabaseURL() string {
 	if s := os.Getenv("GYM_DATABASE_URL"); s != "" {
 		return s
 	}
-	return os.Getenv("DATABASE_URL") // Fly postgres attach sets this
+	// On Fly.io, use DATABASE_URL (set by postgres attach)
+	if os.Getenv("FLY_APP_NAME") != "" {
+		return os.Getenv("DATABASE_URL")
+	}
+	return ""
 }
 
 func GoogleClientID() string {

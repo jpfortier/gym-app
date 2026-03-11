@@ -1,4 +1,5 @@
 # Binaries
+gym-api
 *.exe
 *.exe~
 *.dll

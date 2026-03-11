@@ -11,7 +11,7 @@
 fly postgres attach gym-app-pg --app gym-app
 ```
 
-This sets `DATABASE_URL` automatically. The app uses `GYM_DATABASE_URL` or falls back to `DATABASE_URL`.
+This sets `DATABASE_URL` automatically. The app uses it on Fly when `GYM_DATABASE_URL` is unset.
 
 ## 2. Set secrets (API keys, etc.)
 
@@ -60,7 +60,7 @@ fly secrets list -a gym-app   # names only, not values
 
 ## Notes
 
-- **GYM_DATABASE_URL:** If you attach Postgres, Fly sets `DATABASE_URL`. The app prefers `GYM_DATABASE_URL`; if unset, it uses `DATABASE_URL`.
+- **GYM_DATABASE_URL:** Optional on Fly. If unset, the app uses `DATABASE_URL` (set by postgres attach). Locally, use `GYM_DATABASE_URL` only.
 - **GYM_OPENAI_TEST_MODE:** Must be `false` in production so the real LLM is used. Omit or set explicitly.
 - **GYM_DEV_MODE:** Never set in production. Enables dev token; only for local/test.
 - **fly.toml [env]:** Non-sensitive vars (e.g. `PRIMARY_REGION`, `PORT`) can go in `fly.toml` under `[env]`. Use `fly secrets set` for sensitive values.

@@ -83,9 +83,10 @@ For correction/remove: include ui_text.preview with a short human-readable descr
 
 Rules:
 - exercise_name: use common names (Bench Press, Deadlift, Squat, etc). Lowercase for category in query.
+- Never default to any exercise. If user does not specify which exercise (e.g. "what's my history?", "how much?", "fix that"), leave category empty. Only populate when user explicitly names or implies the exercise.
 - variant_name: "standard" unless user specifies.
 - sets: weight in lbs, reps as int. set_order 1,2,3... set_type optional.
-- When user says only weight (e.g. "150 pounds", "for 150", "bench 150") without reps, use reps=1 (single rep).
+- When user says only weight (e.g. "150 pounds", "for 150", "bench 150") without reps, use reps=1 (single rep). Never use reps=0 when weight is given.
 - For bodyweight: omit weight or null.
 - date: always YYYY-MM-DD. Infer "today" as {{.Today}}, "yesterday" as {{.Yesterday}}.
 - Output ONLY valid JSON, no markdown, no explanation.
@@ -153,7 +154,7 @@ func (p *parserImpl) parseMock(text string, userName string) (*ParsedIntent, err
 		return &ParsedIntent{Intent: "update_name", Name: strings.TrimSpace(name)}, nil
 	}
 	if strings.Contains(text, "what") || strings.Contains(text, "how much") || strings.Contains(text, "history") {
-		return &ParsedIntent{Intent: "query", Category: "bench press", Variant: "standard"}, nil
+		return &ParsedIntent{Intent: "query", Category: inferCategoryFromText(text), Variant: "standard"}, nil
 	}
 	if strings.Contains(text, "change") || strings.Contains(text, "correct") || strings.Contains(text, "wrong") {
 		return &ParsedIntent{
@@ -193,17 +194,51 @@ func (p *parserImpl) parseMock(text string, userName string) (*ParsedIntent, err
 			UIText:      &ParsedUIText{Preview: "Remove the last entry."},
 		}, nil
 	}
+	exName := inferCategoryFromText(text)
+	if exName == "" {
+		return &ParsedIntent{Intent: "unknown", Ambiguities: []string{"exercise_required"}}, nil
+	}
 	w := 135.0
 	return &ParsedIntent{
 		Intent: "log",
 		Date:   time.Now().Format("2006-01-02"),
 		Exercises: []ParsedExercise{{
-			ExerciseName: "Bench Press",
+			ExerciseName: exName,
 			VariantName:  "standard",
 			RawSpeech:    text,
 			Sets:         []ParsedSet{{Weight: &w, Reps: 8, SetType: "working", SetOrder: 1}},
 		}},
 	}, nil
+}
+
+// inferCategoryFromText extracts exercise category from text when present. Returns empty if none found.
+func inferCategoryFromText(text string) string {
+	t := strings.ToLower(text)
+	if strings.Contains(t, "bench") {
+		return "Bench Press"
+	}
+	if strings.Contains(t, "squat") {
+		return "Squat"
+	}
+	if strings.Contains(t, "deadlift") || strings.Contains(t, "rdl") {
+		return "Deadlift"
+	}
+	if strings.Contains(t, "press") || strings.Contains(t, "ohp") {
+		return "Shoulder Press"
+	}
+	if strings.Contains(t, "row") || strings.Contains(t, "pull") {
+		return "Row"
+	}
+	if strings.Contains(t, "curl") {
+		return "Curl"
+	}
+	if strings.Contains(t, "lunge") {
+		return "Lunge"
+	}
+	if strings.Contains(t, "plank") {
+		return "Plank"
+	}
+	return ""
 }
 
 func ptrFloat(f float64) *float64 { return &f }

@@ -264,6 +264,9 @@ func buildAssistantSummary(r *Response, intent *ai.ParsedIntent) string {
 		}
 		return r.Message
 	case "query":
+		if r.Message != "" {
+			return r.Message
+		}
 		if r.History != nil && r.History.ExerciseName != "" {
 			return fmt.Sprintf("Here's your %s %s history.", r.History.ExerciseName, r.History.VariantName)
 		}
@@ -341,10 +344,51 @@ func (s *Service) handleLog(ctx context.Context, userID uuid.UUID, intent *ai.Pa
 	return &Response{Intent: "log", Message: msg, Entries: results, PRs: allPRs}, nil
 }
 
+// formatQuerySummary builds a message with actual data for clients that only display message.
+func formatQuerySummary(catName, variantName string, entries []query.HistoryEntry) string {
+	if len(entries) == 0 {
+		return "Nothing logged for that yet."
+	}
+	var parts []string
+	var maxW *float64
+	var maxR int
+	for _, e := range entries {
+		for _, set := range e.Sets {
+			if set.Weight != nil {
+				w, r := *set.Weight, set.Reps
+				if r == 0 {
+					r = 1
+				}
+				dateShort := e.SessionDate
+				if parsed, err := time.Parse("2006-01-02", e.SessionDate); err == nil {
+					dateShort = parsed.Format("Jan 2")
+				}
+				parts = append(parts, fmt.Sprintf("%.0f×%d (%s)", w, r, dateShort))
+				if maxW == nil || *set.Weight > *maxW {
+					maxW = set.Weight
+					if set.Reps > 0 {
+						maxR = set.Reps
+					} else {
+						maxR = 1
+					}
+				}
+			}
+		}
+	}
+	if len(parts) > 5 {
+		parts = parts[:5]
+	}
+	msg := fmt.Sprintf("Here's your %s %s history: %s.", catName, variantName, strings.Join(parts, ", "))
+	if maxW != nil && len(entries) > 1 {
+		msg += fmt.Sprintf(" Heaviest: %.0f×%d.", *maxW, maxR)
+	}
+	return msg
+}
+
 func (s *Service) handleQuery(ctx context.Context, userID uuid.UUID, intent *ai.ParsedIntent) (*Response, error) {
 	cat := intent.Category
 	if cat == "" {
-		cat = "bench press"
+		return &Response{Intent: "query", Message: "Which exercise?"}, nil
 	}
 	variant := intent.Variant
 	if variant == "" {
@@ -377,7 +421,7 @@ func (s *Service) handleQuery(ctx context.Context, userID uuid.UUID, intent *ai.
 	}
 	msg := "Nothing logged for that yet."
 	if len(entries) > 0 {
-		msg = fmt.Sprintf("Here's your %s %s history.", catName, v.Name)
+		msg = formatQuerySummary(catName, v.Name, entries)
 	}
 	return &Response{
 		Intent:  "query",
@@ -487,7 +531,7 @@ func (s *Service) handleName(ctx context.Context, u *user.User, intent *ai.Parse
 func (s *Service) handleCorrection(ctx context.Context, userID uuid.UUID, intent *ai.ParsedIntent) (*Response, error) {
 	cat := intent.Category
 	if cat == "" {
-		cat = "bench press"
+		return &Response{Intent: "correction", Message: "Which one should I fix?"}, nil
 	}
 	variant := intent.Variant
 	if variant == "" {

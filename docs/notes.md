@@ -53,7 +53,7 @@ Build segment by segment. Each segment gets a test before moving on.
 
 ## Migrations (release command)
 
-Migrations run automatically before each deploy via `release_command`. Requires `GYM_DATABASE_URL` or `DATABASE_URL` (Fly postgres attach sets `DATABASE_URL`). Set with `fly postgres attach gym-app-pg --app gym-app` or `fly secrets set GYM_DATABASE_URL="postgres://..." -a gym-app`.
+Migrations run automatically before each deploy via `release_command`. On Fly, `fly postgres attach` sets `DATABASE_URL`; the app uses it. Locally, use `GYM_DATABASE_URL` only.
 
 **Deploy to Fly:** See `docs/deploy-fly.md` for secrets, env vars, and deployment steps.
 
@@ -71,7 +71,7 @@ Keep the proxy running in a terminal while developing. Stop with Ctrl+C.
 
 **pgvector (migration 000008):** Embeddings require the pgvector extension. For Fly Postgres Flex: use `ziadm/postgres-flex-pgvector:17.2` image (`fly image update --image ziadm/postgres-flex-pgvector:17.2 -a gym-app-pg -y`), then `CREATE EXTENSION vector` and run migrations. For Fly MPG: enable in dashboard → Postgres (Beta) → Extensions. For local: `brew install pgvector`.
 
-**GYM_ prefix:** All gym env vars use `GYM_` prefix (e.g. `GYM_DATABASE_URL`) to avoid collisions with other projects. If you have `DATABASE_URL` set in your shell for worklist or another project, gym will use `GYM_DATABASE_URL` from `.env` instead.
+**GYM_ prefix:** Locally, gym uses only `GYM_DATABASE_URL` (avoids collisions with other projects). On Fly.io, uses `DATABASE_URL` when `GYM_DATABASE_URL` is unset (Fly sets it via postgres attach).
 
 **Reset password** (if needed): `printf 'ALTER USER postgres PASSWORD '\''newpass'\'';\n\\q\n' | fly postgres connect -a gym-app-pg`. If that fails with "password authentication failed", use SSH + unix socket: `fly ssh console -a gym-app-pg -C "su postgres -c \"psql -h /var/run/postgresql -p 5433 -d postgres -c \\\"ALTER USER postgres PASSWORD 'newpass';\\\"\""` (postgres-flex uses port 5433 for the socket).
 

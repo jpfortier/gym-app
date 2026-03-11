@@ -13,17 +13,17 @@ lint:
 MIGRATE := $(shell which migrate 2>/dev/null || echo "$(shell go env GOPATH)/bin/migrate")
 migrate-up:
 	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
-	$(MIGRATE) -path migrations -database "$${GYM_DATABASE_URL:-$$DATABASE_URL}" up
+	$(MIGRATE) -path migrations -database "$$GYM_DATABASE_URL" up
 
 migrate-down:
 	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
-	$(MIGRATE) -path migrations -database "$${GYM_DATABASE_URL:-$$DATABASE_URL}" down
+	$(MIGRATE) -path migrations -database "$$GYM_DATABASE_URL" down
 
 # Dump current schema to docs/schema.sql. Run after migrations. Uses .env for GYM_DATABASE_URL.
 # Requires pg_dump version >= Postgres server (e.g. brew install postgresql@17 for Fly Postgres 17).
 schema-dump:
 	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
-	pg_dump -d "$${GYM_DATABASE_URL:-$$DATABASE_URL}" --schema-only --no-owner --no-privileges -f docs/schema.sql && \
+	pg_dump -d "$$GYM_DATABASE_URL" --schema-only --no-owner --no-privileges -f docs/schema.sql && \
 	echo "Wrote docs/schema.sql" || (echo "pg_dump failed (version mismatch? need pg_dump >= server)"; exit 1)
 
 # Run tests. Uses .env for GYM_* vars.

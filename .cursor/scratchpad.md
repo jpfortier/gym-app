@@ -14,7 +14,7 @@
 
 ## Next
 
-V2: FCM, notifications, admin panel.
+V2: FCM, notifications. Admin panel implemented.
 
 ## Architecture Backlog (from changes.md)
 
@@ -71,7 +71,7 @@ LLM outputs `assumptions` and `ambiguities`. Code uses them to decide confirm vs
 19. PR detection
 20. DALL-E + R2
 
-**V2:** FCM, notifications, admin panel
+**V2:** FCM, notifications. Admin panel done.
 
 ## Development workflow (Executor)
 
@@ -90,7 +90,9 @@ Segment by segment. For each segment: implement → test → verify. Then integr
 
 ## Executor progress
 
-Segments 1–6 done: Session repo+service, Log entry repo+service, Exercise repo+resolution. All tests pass. `make test` sources .env for DATABASE_URL.
+Segments 1–6 done: Session repo+service, Log entry repo+service, Exercise repo+resolution. All tests pass. `make test` sources .env for GYM_DATABASE_URL.
+
+Admin panel: RequireAdmin middleware, cookie-based user picker, dashboard, users, sessions, session detail, PRs, usage, notes. Login page for browser auth. Tests for RequireAdmin (403 non-admin, 200 admin). Admin handler tests require DB.
 
 ## Auth (completed)
 
@@ -98,12 +100,12 @@ Segments 1–6 done: Session repo+service, Log entry repo+service, Exercise repo
 - `internal/auth/middleware.go` — RequireAuth middleware, get-or-create user, UserFromContext
 - `internal/user/` — User struct, Repo (GetByGoogleID, Create, GetByEmail)
 - `GET /me` — protected endpoint returning current user (for testing auth)
-- Env: GOOGLE_CLIENT_ID (OAuth2 client ID), DATABASE_URL
+- Env: GYM_GOOGLE_CLIENT_ID (OAuth2 client ID), GYM_DATABASE_URL
 
 ## Dev token (completed)
 
 - `GYM_DEV_MODE=true` — Enables GET /dev/token and Bearer dev:\<email\> auth
-- `GET /dev/token` — Returns `{ "token": "dev:<email>" }` (default test@datavysta.com; override with ?email=)
+- `GET /dev/token` — Returns `{ "token": "dev:<email>" }` (default test@example.com; override with ?email=)
 - Bearer dev:\<email\> — Middleware accepts; user looked up by email, created if missing (google_id = "dev-" + email)
 - Documented in docs/api.md, .env.example
 

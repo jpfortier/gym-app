@@ -13,7 +13,7 @@ import (
 func New(ctx context.Context) (*sql.DB, error) {
 	connStr := env.DatabaseURL()
 	if connStr == "" {
-		return nil, fmt.Errorf("GYM_DATABASE_URL not set")
+		return nil, fmt.Errorf("database URL not configured (GYM_DATABASE_URL locally, DATABASE_URL on Fly)")
 	}
 
 	db, err := sql.Open("pgx", connStr)
