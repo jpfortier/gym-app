@@ -1,6 +1,4 @@
--- Consolidated schema (current state). Generated from migrations.
--- To refresh: make schema-dump (requires pg_dump version >= Postgres server, e.g. 17 for Fly).
--- If pg_dump fails with version mismatch: brew upgrade postgresql@17
+-- Consolidated schema (current state). Reflects migrations.
 
 CREATE EXTENSION IF NOT EXISTS vector;
 
@@ -33,11 +31,15 @@ CREATE TABLE exercise_variants (
     category_id uuid NOT NULL REFERENCES exercise_categories(id) ON DELETE CASCADE,
     user_id uuid REFERENCES users(id) ON DELETE CASCADE,
     name text NOT NULL,
+    standard boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     embedding vector(1536),
     UNIQUE (category_id, user_id, name)
 );
+CREATE UNIQUE INDEX idx_exercise_variants_one_standard_per_category
+  ON exercise_variants (category_id, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid))
+  WHERE standard = true;
 
 CREATE TABLE workout_sessions (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

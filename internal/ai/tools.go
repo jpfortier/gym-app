@@ -44,7 +44,7 @@ func ChatTools() []openai.Tool {
 									"type":       {Type: jsonschema.String, Description: "ENSURE_SESSION, CREATE_EXERCISE_ENTRY, APPEND_SET, UPDATE_SET, DELETE_SET, RESTORE_ENTRY, SET_NAME, UPDATE_NAME, CREATE_NOTE"},
 									"date":       {Type: jsonschema.String, Description: "YYYY-MM-DD for ENSURE_SESSION"},
 									"exercise":   {Type: jsonschema.String, Description: "For CREATE_EXERCISE_ENTRY, CREATE_NOTE"},
-									"variant":   {Type: jsonschema.String, Description: "For CREATE_EXERCISE_ENTRY, CREATE_NOTE, default 'standard'"},
+									"variant":   {Type: jsonschema.String, Description: "For CREATE_EXERCISE_ENTRY, CREATE_NOTE. Omit when user doesn't specify—we use the standard variant for that category."},
 									"raw_speech": {Type: jsonschema.String, Description: "For CREATE_EXERCISE_ENTRY"},
 									"sets": {
 										Type: jsonschema.Array,

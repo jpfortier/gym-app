@@ -42,11 +42,12 @@ func NewService(repo *Repo, embedder Embedder) *Service {
 }
 
 // ResolveOrCreate resolves (categoryName, variantName) to a Variant, or creates user-level category+variant.
+// When variantName is empty, uses the standard variant for that category.
 func (s *Service) ResolveOrCreate(ctx context.Context, userID uuid.UUID, categoryName, variantName string) (*Variant, error) {
 	categoryName = strings.TrimSpace(strings.ToLower(categoryName))
 	variantName = strings.TrimSpace(strings.ToLower(variantName))
-	if categoryName == "" || variantName == "" {
-		return nil, fmt.Errorf("category and variant names required")
+	if categoryName == "" {
+		return nil, fmt.Errorf("category name required")
 	}
 	v, err := s.repo.Resolve(ctx, userID, categoryName, variantName)
 	if err != nil {
@@ -107,10 +108,15 @@ func (s *Service) createCategoryAndVariant(ctx context.Context, userID uuid.UUID
 	if err := s.repo.CreateCategory(ctx, cat); err != nil {
 		return nil, fmt.Errorf("create category: %w", err)
 	}
+	name := variantName
+	if name == "" {
+		name = "standard"
+	}
 	v := &Variant{
 		CategoryID: cat.ID,
 		UserID:     &userID,
-		Name:       variantName,
+		Name:       name,
+		Standard:   true, // first variant for new category is the default
 	}
 	if err := s.repo.CreateVariant(ctx, v); err != nil {
 		return nil, fmt.Errorf("create variant: %w", err)

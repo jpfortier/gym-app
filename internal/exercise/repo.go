@@ -72,10 +72,10 @@ func (r *Repo) GetCategoryByUserAndName(ctx context.Context, userID *uuid.UUID, 
 func (r *Repo) CreateVariant(ctx context.Context, v *Variant) error {
 	db.EnsureV7(&v.ID)
 	return r.db.QueryRowContext(ctx,
-		`INSERT INTO exercise_variants (id, category_id, user_id, name)
-		 VALUES ($1, $2, $3, $4)
+		`INSERT INTO exercise_variants (id, category_id, user_id, name, standard)
+		 VALUES ($1, $2, $3, $4, $5)
 		 RETURNING created_at`,
-		v.ID, v.CategoryID, db.NullUUID(v.UserID), v.Name,
+		v.ID, v.CategoryID, db.NullUUID(v.UserID), v.Name, v.Standard,
 	).Scan(&v.CreatedAt)
 }
 
@@ -83,9 +83,9 @@ func (r *Repo) GetVariantByID(ctx context.Context, id uuid.UUID) (*Variant, erro
 	var v Variant
 	var userID sql.NullString
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, category_id, user_id, name, created_at FROM exercise_variants WHERE id = $1`,
+		`SELECT id, category_id, user_id, name, standard, created_at FROM exercise_variants WHERE id = $1`,
 		id,
-	).Scan(&v.ID, &v.CategoryID, &userID, &v.Name, &v.CreatedAt)
+	).Scan(&v.ID, &v.CategoryID, &userID, &v.Name, &v.Standard, &v.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -105,10 +105,10 @@ func (r *Repo) GetVariantByCategoryAndName(ctx context.Context, categoryID uuid.
 	var v Variant
 	var uid sql.NullString
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, category_id, user_id, name, created_at FROM exercise_variants
+		`SELECT id, category_id, user_id, name, standard, created_at FROM exercise_variants
 		 WHERE category_id = $1 AND (user_id IS NOT DISTINCT FROM $2) AND LOWER(name) = $3`,
 		categoryID, userVal, name,
-	).Scan(&v.ID, &v.CategoryID, &uid, &v.Name, &v.CreatedAt)
+	).Scan(&v.ID, &v.CategoryID, &uid, &v.Name, &v.Standard, &v.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -121,7 +121,7 @@ func (r *Repo) GetVariantByCategoryAndName(ctx context.Context, categoryID uuid.
 
 func (r *Repo) ListVariantsByCategory(ctx context.Context, categoryID uuid.UUID, userID uuid.UUID) ([]*Variant, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, category_id, user_id, name, created_at FROM exercise_variants
+		`SELECT id, category_id, user_id, name, standard, created_at FROM exercise_variants
 		 WHERE category_id = $1 AND (user_id IS NULL OR user_id = $2) ORDER BY name`,
 		categoryID, userID,
 	)
@@ -133,7 +133,7 @@ func (r *Repo) ListVariantsByCategory(ctx context.Context, categoryID uuid.UUID,
 	for rows.Next() {
 		var v Variant
 		var uid sql.NullString
-		if err := rows.Scan(&v.ID, &v.CategoryID, &uid, &v.Name, &v.CreatedAt); err != nil {
+		if err := rows.Scan(&v.ID, &v.CategoryID, &uid, &v.Name, &v.Standard, &v.CreatedAt); err != nil {
 			return nil, err
 		}
 		v.UserID = db.NullStringToUUIDPtr(uid)
@@ -188,13 +188,13 @@ func (r *Repo) FindVariantByEmbedding(ctx context.Context, categoryID uuid.UUID,
 	var v Variant
 	var uid sql.NullString
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, category_id, user_id, name, created_at
+		`SELECT id, category_id, user_id, name, standard, created_at
 		 FROM exercise_variants
 		 WHERE category_id = $1 AND (user_id IS NULL OR user_id = $2) AND embedding IS NOT NULL
 		   AND (embedding <=> $3) < $4
 		 ORDER BY embedding <=> $3 LIMIT 1`,
 		categoryID, userID, vec, maxDistance,
-	).Scan(&v.ID, &v.CategoryID, &uid, &v.Name, &v.CreatedAt)
+	).Scan(&v.ID, &v.CategoryID, &uid, &v.Name, &v.Standard, &v.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

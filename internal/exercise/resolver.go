@@ -2,19 +2,23 @@ package exercise
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
+
+	"github.com/jpfortier/gym-app/internal/db"
 )
 
 // Resolver resolves (categoryName, variantName) to a Variant using exact match.
+// When variantName is empty, returns the standard variant for that category.
 // Order: global category first, then user category. For variants: global first, then user.
 func (r *Repo) Resolve(ctx context.Context, userID uuid.UUID, categoryName, variantName string) (*Variant, error) {
 	categoryName = strings.TrimSpace(strings.ToLower(categoryName))
 	variantName = strings.TrimSpace(strings.ToLower(variantName))
-	if categoryName == "" || variantName == "" {
-		return nil, fmt.Errorf("category and variant names required")
+	if categoryName == "" {
+		return nil, fmt.Errorf("category name required")
 	}
 	cat, err := r.resolveCategory(ctx, userID, categoryName)
 	if err != nil {
@@ -22,6 +26,9 @@ func (r *Repo) Resolve(ctx context.Context, userID uuid.UUID, categoryName, vari
 	}
 	if cat == nil {
 		return nil, nil
+	}
+	if variantName == "" {
+		return r.GetStandardVariantByCategory(ctx, cat.ID, userID)
 	}
 	return r.resolveVariant(ctx, cat.ID, userID, variantName)
 }
@@ -46,4 +53,36 @@ func (r *Repo) resolveVariant(ctx context.Context, categoryID uuid.UUID, userID 
 		return v, nil
 	}
 	return r.GetVariantByCategoryAndName(ctx, categoryID, &userID, name)
+}
+
+// GetStandardVariantByCategory returns the variant with standard=true for the category.
+// Order: global (user_id null) first, then user-level.
+func (r *Repo) GetStandardVariantByCategory(ctx context.Context, categoryID uuid.UUID, userID uuid.UUID) (*Variant, error) {
+	v, err := r.getStandardVariant(ctx, categoryID, nil)
+	if err != nil || v != nil {
+		return v, err
+	}
+	return r.getStandardVariant(ctx, categoryID, &userID)
+}
+
+func (r *Repo) getStandardVariant(ctx context.Context, categoryID uuid.UUID, userID *uuid.UUID) (*Variant, error) {
+	var userVal interface{}
+	if userID != nil {
+		userVal = *userID
+	}
+	var v Variant
+	var uid sql.NullString
+	err := r.db.QueryRowContext(ctx,
+		`SELECT id, category_id, user_id, name, standard, created_at FROM exercise_variants
+		 WHERE category_id = $1 AND (user_id IS NOT DISTINCT FROM $2) AND standard = true`,
+		categoryID, userVal,
+	).Scan(&v.ID, &v.CategoryID, &uid, &v.Name, &v.Standard, &v.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	v.UserID = db.NullStringToUUIDPtr(uid)
+	return &v, nil
 }

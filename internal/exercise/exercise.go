@@ -20,5 +20,6 @@ type Variant struct {
 	CategoryID uuid.UUID
 	UserID     *uuid.UUID
 	Name       string
+	Standard   bool
 	CreatedAt  time.Time
 }
