@@ -6,7 +6,8 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 go build -o /api ./cmd/api
+RUN BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) && \
+    CGO_ENABLED=0 go build -ldflags "-X github.com/jpfortier/gym-app/internal/env.buildDate=$$BUILD_DATE" -o /api ./cmd/api
 
 RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
