@@ -6,14 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/jpfortier/gym-app/internal/exercise"
-	"github.com/jpfortier/gym-app/internal/testutil"
 	"github.com/jpfortier/gym-app/internal/logentry"
 	"github.com/jpfortier/gym-app/internal/session"
-	"github.com/jpfortier/gym-app/internal/user"
+	"github.com/jpfortier/gym-app/internal/testutil"
 )
 
 func dbForTest(t *testing.T) *sql.DB { return testutil.DBForTest(t) }
@@ -23,12 +21,7 @@ func TestService_History_returnsEntries(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "query-svc-" + uuid.New().String(), Email: "qs-" + uuid.New().String() + "@test.com", Name: "QS"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "query-svc")
 
 	exerciseRepo := exercise.NewRepo(db)
 	variant, err := exerciseRepo.Resolve(ctx, u.ID, "deadlift", "standard")
@@ -80,12 +73,7 @@ func TestService_History_notFoundReturnsNil(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	u := &user.User{GoogleID: "query-nf-" + uuid.New().String(), Email: "qn-" + uuid.New().String() + "@test.com", Name: "QN"}
-	userRepo := user.NewRepo(db)
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "query-nf")
 
 	exerciseRepo := exercise.NewRepo(db)
 	logentryRepo := logentry.NewRepo(db)
@@ -108,12 +96,7 @@ func TestService_Query_emptyCategoryReturnsError(t *testing.T) {
 	db := dbForTest(t)
 	defer db.Close()
 	ctx := context.Background()
-	u := &user.User{GoogleID: "q-ec-" + uuid.New().String(), Email: "qec-" + uuid.New().String() + "@test.com", Name: "QEC"}
-	userRepo := user.NewRepo(db)
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "q-ec")
 
 	svc := NewService(exercise.NewRepo(db), logentry.NewRepo(db), session.NewRepo(db))
 	_, err := svc.Query(ctx, u.ID, QueryParams{Category: ""})
@@ -126,12 +109,7 @@ func TestService_Query_nonexistentExerciseReturnsNil(t *testing.T) {
 	db := dbForTest(t)
 	defer db.Close()
 	ctx := context.Background()
-	u := &user.User{GoogleID: "q-ne-" + uuid.New().String(), Email: "qne-" + uuid.New().String() + "@test.com", Name: "QNE"}
-	userRepo := user.NewRepo(db)
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "q-ne")
 
 	svc := NewService(exercise.NewRepo(db), logentry.NewRepo(db), session.NewRepo(db))
 	res, err := svc.Query(ctx, u.ID, QueryParams{Category: "nonexistent", Variant: "standard"})
@@ -147,12 +125,7 @@ func TestService_Query_scopeMostRecent(t *testing.T) {
 	db := dbForTest(t)
 	defer db.Close()
 	ctx := context.Background()
-	u := &user.User{GoogleID: "q-smr-" + uuid.New().String(), Email: "qsmr-" + uuid.New().String() + "@test.com", Name: "QSMR"}
-	userRepo := user.NewRepo(db)
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "q-smr")
 
 	exerciseRepo := exercise.NewRepo(db)
 	variant, err := exerciseRepo.Resolve(ctx, u.ID, "deadlift", "standard")
@@ -201,12 +174,7 @@ func TestService_Query_scopeBest(t *testing.T) {
 	db := dbForTest(t)
 	defer db.Close()
 	ctx := context.Background()
-	u := &user.User{GoogleID: "q-sb-" + uuid.New().String(), Email: "qsb-" + uuid.New().String() + "@test.com", Name: "QSB"}
-	userRepo := user.NewRepo(db)
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "q-sb")
 
 	exerciseRepo := exercise.NewRepo(db)
 	variant, err := exerciseRepo.Resolve(ctx, u.ID, "bench press", "standard")
@@ -245,12 +213,7 @@ func TestService_Query_scopeAggregate(t *testing.T) {
 	db := dbForTest(t)
 	defer db.Close()
 	ctx := context.Background()
-	u := &user.User{GoogleID: "q-sa-" + uuid.New().String(), Email: "qsa-" + uuid.New().String() + "@test.com", Name: "QSA"}
-	userRepo := user.NewRepo(db)
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "q-sa")
 
 	exerciseRepo := exercise.NewRepo(db)
 	variant, err := exerciseRepo.Resolve(ctx, u.ID, "squat", "standard")
@@ -304,12 +267,7 @@ func TestService_Query_metricMaxWeight(t *testing.T) {
 	db := dbForTest(t)
 	defer db.Close()
 	ctx := context.Background()
-	u := &user.User{GoogleID: "q-mw-" + uuid.New().String(), Email: "qmw-" + uuid.New().String() + "@test.com", Name: "QMW"}
-	userRepo := user.NewRepo(db)
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "q-mw")
 
 	exerciseRepo := exercise.NewRepo(db)
 	variant, err := exerciseRepo.Resolve(ctx, u.ID, "deadlift", "standard")
@@ -346,12 +304,7 @@ func TestService_Query_metricLatestWeight(t *testing.T) {
 	db := dbForTest(t)
 	defer db.Close()
 	ctx := context.Background()
-	u := &user.User{GoogleID: "q-lw-" + uuid.New().String(), Email: "qlw-" + uuid.New().String() + "@test.com", Name: "QLW"}
-	userRepo := user.NewRepo(db)
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "q-lw")
 
 	exerciseRepo := exercise.NewRepo(db)
 	variant, err := exerciseRepo.Resolve(ctx, u.ID, "deadlift", "standard")
@@ -388,12 +341,7 @@ func TestService_Query_metricEstimated1RM(t *testing.T) {
 	db := dbForTest(t)
 	defer db.Close()
 	ctx := context.Background()
-	u := &user.User{GoogleID: "q-1rm-" + uuid.New().String(), Email: "q1rm-" + uuid.New().String() + "@test.com", Name: "Q1RM"}
-	userRepo := user.NewRepo(db)
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "q-1rm")
 
 	exerciseRepo := exercise.NewRepo(db)
 	variant, err := exerciseRepo.Resolve(ctx, u.ID, "bench press", "standard")
@@ -431,12 +379,7 @@ func TestService_Query_metricCountSetsAndTotalVolume(t *testing.T) {
 	db := dbForTest(t)
 	defer db.Close()
 	ctx := context.Background()
-	u := &user.User{GoogleID: "q-cs-" + uuid.New().String(), Email: "qcs-" + uuid.New().String() + "@test.com", Name: "QCS"}
-	userRepo := user.NewRepo(db)
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "q-cs")
 
 	exerciseRepo := exercise.NewRepo(db)
 	variant, err := exerciseRepo.Resolve(ctx, u.ID, "squat", "standard")

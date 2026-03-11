@@ -13,6 +13,7 @@ import (
 	"github.com/jpfortier/gym-app/internal/auth"
 	"github.com/jpfortier/gym-app/internal/exercise"
 	"github.com/jpfortier/gym-app/internal/pr"
+	"github.com/jpfortier/gym-app/internal/testutil"
 	"github.com/jpfortier/gym-app/internal/user"
 )
 
@@ -21,12 +22,8 @@ func TestPRsList_returnsUserPRs(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
+	u := testutil.CreateTestUser(t, db, ctx, "prs")
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "prs-" + uuid.New().String(), Email: "pr-" + uuid.New().String() + "@test.com", Name: "PR"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	var variantID uuid.UUID
 	if err := db.QueryRowContext(ctx, `SELECT id FROM exercise_variants WHERE user_id IS NULL LIMIT 1`).Scan(&variantID); err != nil {
@@ -71,12 +68,8 @@ func TestPRImage_returns404WhenImageNotReady(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
+	u := testutil.CreateTestUser(t, db, ctx, "primg")
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "primg-" + uuid.New().String(), Email: "primg-" + uuid.New().String() + "@test.com", Name: "PRImg"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	var variantID uuid.UUID
 	if err := db.QueryRowContext(ctx, `SELECT id FROM exercise_variants WHERE user_id IS NULL LIMIT 1`).Scan(&variantID); err != nil {
@@ -109,15 +102,9 @@ func TestPRImage_returns404WhenWrongUser(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
+	u1 := testutil.CreateTestUser(t, db, ctx, "primg-u1")
+	u2 := testutil.CreateTestUser(t, db, ctx, "primg-u2")
 	userRepo := user.NewRepo(db)
-	u1 := &user.User{GoogleID: "primg-u1-" + uuid.New().String(), Email: "u1-" + uuid.New().String() + "@test.com", Name: "U1"}
-	u2 := &user.User{GoogleID: "primg-u2-" + uuid.New().String(), Email: "u2-" + uuid.New().String() + "@test.com", Name: "U2"}
-	for _, u := range []*user.User{u1, u2} {
-		if err := userRepo.Create(ctx, u); err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
-	}
 
 	var variantID uuid.UUID
 	if err := db.QueryRowContext(ctx, `SELECT id FROM exercise_variants WHERE user_id IS NULL LIMIT 1`).Scan(&variantID); err != nil {
@@ -153,13 +140,8 @@ func TestPRImage_returns404WhenNotFound(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
+	u := testutil.CreateTestUser(t, db, ctx, "primg-nf")
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "primg-nf-" + uuid.New().String(), Email: "nf-" + uuid.New().String() + "@test.com", Name: "NF"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
-
 	prRepo := pr.NewRepo(db)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
@@ -199,13 +181,8 @@ func TestPRImage_returns400WhenInvalidID(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
+	u := testutil.CreateTestUser(t, db, ctx, "primg-inv")
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "primg-inv-" + uuid.New().String(), Email: "inv-" + uuid.New().String() + "@test.com", Name: "Inv"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
-
 	prRepo := pr.NewRepo(db)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
@@ -226,12 +203,8 @@ func TestPRImage_returns503WhenR2NotConfigured(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
+	u := testutil.CreateTestUser(t, db, ctx, "primg-r2")
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "primg-r2-" + uuid.New().String(), Email: "r2-" + uuid.New().String() + "@test.com", Name: "R2"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	var variantID uuid.UUID
 	if err := db.QueryRowContext(ctx, `SELECT id FROM exercise_variants WHERE user_id IS NULL LIMIT 1`).Scan(&variantID); err != nil {

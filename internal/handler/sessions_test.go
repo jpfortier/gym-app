@@ -28,12 +28,8 @@ func TestSessionsList_returnsUserSessions(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
+	u := testutil.CreateTestUser(t, db, ctx, "sessions-list")
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "sessions-list-" + uuid.New().String(), Email: "sl-" + uuid.New().String() + "@test.com", Name: "SL"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	sessionRepo := session.NewRepo(db)
 	parsed, _ := time.Parse("2006-01-02", "2025-03-16")
@@ -72,7 +68,6 @@ func TestSessionDetail_returnsSessionWithEntries(t *testing.T) {
 	ctx := context.Background()
 
 	u := createSessionsTestUser(t, db, ctx)
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) }()
 
 	sessionRepo := session.NewRepo(db)
 	parsed, _ := time.Parse("2006-01-02", "2025-03-17")
@@ -125,7 +120,6 @@ func TestSessionDetail_otherUserReturns404(t *testing.T) {
 
 	u1 := createSessionsTestUser(t, db, ctx)
 	u2 := createSessionsTestUser(t, db, ctx)
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id IN ($1, $2)", u1.ID, u2.ID) }()
 
 	sessionRepo := session.NewRepo(db)
 	parsed, _ := time.Parse("2006-01-02", "2025-03-18")
@@ -149,13 +143,7 @@ func TestSessionDetail_otherUserReturns404(t *testing.T) {
 }
 
 func createSessionsTestUser(t *testing.T, db *sql.DB, ctx context.Context) *user.User {
-	t.Helper()
-	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "sessions-" + uuid.New().String(), Email: "s-" + uuid.New().String() + "@test.com", Name: "S"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	return u
+	return testutil.CreateTestUser(t, db, ctx, "sessions")
 }
 
 type mockVerifier struct {

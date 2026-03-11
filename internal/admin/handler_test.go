@@ -41,10 +41,7 @@ func setupAdminTest(t *testing.T) (db *sql.DB, adminUser *user.User, h *Handler,
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	adminUser = &user.User{GoogleID: "admin-" + uuid.New().String(), Email: "admin-" + uuid.New().String() + "@test.com", Name: "Admin"}
-	if err := userRepo.Create(ctx, adminUser); err != nil {
-		t.Fatal(err)
-	}
+	adminUser = testutil.CreateTestUser(t, db, ctx, "admin")
 	if _, err := db.ExecContext(ctx, "UPDATE users SET role = 'admin' WHERE id = $1", adminUser.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -79,10 +76,7 @@ func setupAdminTest(t *testing.T) (db *sql.DB, adminUser *user.User, h *Handler,
 	mux.Handle("GET /admin/notes", adminWithCookie(http.HandlerFunc(h.Notes)))
 	mux.Handle("POST /admin/select-user", adminWithCookie(http.HandlerFunc(h.SelectUser)))
 
-	cleanup = func() {
-		_, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", adminUser.ID)
-		db.Close()
-	}
+	cleanup = func() { db.Close() }
 	return db, adminUser, h, mux, cleanup
 }
 
@@ -202,11 +196,7 @@ func TestAdmin_Dashboard_withSelectedUser_showsData(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 
-	targetUser := &user.User{GoogleID: "target-" + uuid.New().String(), Email: "target-" + uuid.New().String() + "@test.com", Name: "Target"}
-	if err := user.NewRepo(db).Create(ctx, targetUser); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", targetUser.ID) }()
+	targetUser := testutil.CreateTestUser(t, db, ctx, "target")
 
 	sessionRepo := session.NewRepo(db)
 	parsed, _ := time.Parse("2006-01-02", "2025-03-20")
@@ -233,11 +223,7 @@ func TestAdmin_SelectUser_setsCookieAndRedirects(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 
-	targetUser := &user.User{GoogleID: "target-sel-" + uuid.New().String(), Email: "targetsel-" + uuid.New().String() + "@test.com", Name: "Target"}
-	if err := user.NewRepo(db).Create(ctx, targetUser); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", targetUser.ID) }()
+	targetUser := testutil.CreateTestUser(t, db, ctx, "target-sel")
 
 	body := "user_id=" + targetUser.ID.String() + "&redirect=/admin/sessions"
 	req := authReq(httptest.NewRequest(http.MethodPost, "/admin/select-user", strings.NewReader(body)), "x")
@@ -291,11 +277,7 @@ func TestAdmin_Users_returnsUserList(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 
-	otherUser := &user.User{GoogleID: "other-" + uuid.New().String(), Email: "other-" + uuid.New().String() + "@test.com", Name: "Other"}
-	if err := user.NewRepo(db).Create(ctx, otherUser); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", otherUser.ID) }()
+	otherUser := testutil.CreateTestUser(t, db, ctx, "other")
 
 	req := authReq(httptest.NewRequest(http.MethodGet, "/admin/users", nil), "x")
 	rec := httptest.NewRecorder()
@@ -331,11 +313,7 @@ func TestAdmin_Sessions_withSelectedUser_showsSessions(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 
-	targetUser := &user.User{GoogleID: "target-sess-" + uuid.New().String(), Email: "targetsess-" + uuid.New().String() + "@test.com", Name: "Target"}
-	if err := user.NewRepo(db).Create(ctx, targetUser); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", targetUser.ID) }()
+	targetUser := testutil.CreateTestUser(t, db, ctx, "target-sess")
 
 	sessionRepo := session.NewRepo(db)
 	parsed, _ := time.Parse("2006-01-02", "2025-03-21")
@@ -378,11 +356,7 @@ func TestAdmin_SessionDetail_withSelectedUser_showsDetail(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 
-	targetUser := &user.User{GoogleID: "target-detail-" + uuid.New().String(), Email: "targetdetail-" + uuid.New().String() + "@test.com", Name: "Target"}
-	if err := user.NewRepo(db).Create(ctx, targetUser); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", targetUser.ID) }()
+	targetUser := testutil.CreateTestUser(t, db, ctx, "target-detail")
 
 	var variantID uuid.UUID
 	if err := db.QueryRowContext(ctx, `SELECT id FROM exercise_variants WHERE user_id IS NULL LIMIT 1`).Scan(&variantID); err != nil {
@@ -426,11 +400,7 @@ func TestAdmin_SessionDetail_otherUserSession_returns404(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 
-	otherUser := &user.User{GoogleID: "other-sess-" + uuid.New().String(), Email: "othersess-" + uuid.New().String() + "@test.com", Name: "Other"}
-	if err := user.NewRepo(db).Create(ctx, otherUser); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", otherUser.ID) }()
+	otherUser := testutil.CreateTestUser(t, db, ctx, "other-sess")
 
 	sessionRepo := session.NewRepo(db)
 	parsed, _ := time.Parse("2006-01-02", "2025-03-23")
@@ -470,11 +440,7 @@ func TestAdmin_PRs_withSelectedUser_showsPRs(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 
-	targetUser := &user.User{GoogleID: "target-pr-" + uuid.New().String(), Email: "targetpr-" + uuid.New().String() + "@test.com", Name: "Target"}
-	if err := user.NewRepo(db).Create(ctx, targetUser); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", targetUser.ID) }()
+	targetUser := testutil.CreateTestUser(t, db, ctx, "target-pr")
 
 	var variantID uuid.UUID
 	if err := db.QueryRowContext(ctx, `SELECT id FROM exercise_variants WHERE user_id IS NULL LIMIT 1`).Scan(&variantID); err != nil {
@@ -522,11 +488,7 @@ func TestAdmin_Usage_withSelectedUser_showsUsage(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 
-	targetUser := &user.User{GoogleID: "target-usage-" + uuid.New().String(), Email: "targetusage-" + uuid.New().String() + "@test.com", Name: "Target"}
-	if err := user.NewRepo(db).Create(ctx, targetUser); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", targetUser.ID) }()
+	targetUser := testutil.CreateTestUser(t, db, ctx, "target-usage")
 
 	usageRepo := usage.NewRepo(db)
 	usageRepo.Record(ctx, &targetUser.ID, "gpt-4o", 100, 50, 0.5)
@@ -565,11 +527,7 @@ func TestAdmin_Notes_withSelectedUser_showsNotes(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 
-	targetUser := &user.User{GoogleID: "target-notes-" + uuid.New().String(), Email: "targetnotes-" + uuid.New().String() + "@test.com", Name: "Target"}
-	if err := user.NewRepo(db).Create(ctx, targetUser); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", targetUser.ID) }()
+	targetUser := testutil.CreateTestUser(t, db, ctx, "target-notes")
 
 	notesRepo := notes.NewRepo(db)
 	if _, err := notesRepo.Create(ctx, targetUser.ID, nil, nil, "warm up hamstrings"); err != nil {

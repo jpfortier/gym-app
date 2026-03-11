@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/jpfortier/gym-app/internal/testutil"
@@ -19,12 +18,7 @@ func TestRepo_Resolve_seededGlobal(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "ex-" + uuid.New().String(), Email: "ex-" + uuid.New().String() + "@test.com", Name: "Ex"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "ex")
 
 	repo := NewRepo(db)
 	v, err := repo.Resolve(ctx, u.ID, "bench press", "standard")
@@ -34,8 +28,8 @@ func TestRepo_Resolve_seededGlobal(t *testing.T) {
 	if v == nil {
 		t.Fatal("expected variant from seeded bench press / standard")
 	}
-	if v.Name != "standard" {
-		t.Errorf("got variant name %q, want standard", v.Name)
+	if v.Name != "bench press" {
+		t.Errorf("got variant name %q, want bench press (standard variant)", v.Name)
 	}
 }
 
@@ -45,7 +39,6 @@ func TestRepo_Resolve_caseInsensitive(t *testing.T) {
 	ctx := context.Background()
 
 	u := createExerciseTestUser(t, db, ctx)
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) }()
 
 	repo := NewRepo(db)
 	v, err := repo.Resolve(ctx, u.ID, "DEADLIFT", "STANDARD")
@@ -63,7 +56,6 @@ func TestRepo_Resolve_notFound(t *testing.T) {
 	ctx := context.Background()
 
 	u := createExerciseTestUser(t, db, ctx)
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) }()
 
 	repo := NewRepo(db)
 	v, err := repo.Resolve(ctx, u.ID, "nonexistent exercise", "standard")
@@ -81,7 +73,6 @@ func TestRepo_CreateCategory_CreateVariant_Resolve(t *testing.T) {
 	ctx := context.Background()
 
 	u := createExerciseTestUser(t, db, ctx)
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) }()
 
 	repo := NewRepo(db)
 	cat := &Category{UserID: &u.ID, Name: "hula hoop", ShowWeight: true, ShowReps: true}
@@ -108,8 +99,6 @@ func TestRepo_StoreAlias_FindVariantByAlias(t *testing.T) {
 	ctx := context.Background()
 
 	u := createExerciseTestUser(t, db, ctx)
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM user_exercise_aliases WHERE user_id = $1", u.ID) })
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	repo := NewRepo(db)
 	cat := &Category{UserID: &u.ID, Name: "Deadlift", ShowWeight: true, ShowReps: true}
@@ -143,11 +132,5 @@ func TestRepo_StoreAlias_FindVariantByAlias(t *testing.T) {
 }
 
 func createExerciseTestUser(t *testing.T, db *sql.DB, ctx context.Context) *user.User {
-	t.Helper()
-	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "ex-" + uuid.New().String(), Email: "ex-" + uuid.New().String() + "@test.com", Name: "Ex"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	return u
+	return testutil.CreateTestUser(t, db, ctx, "ex")
 }

@@ -7,12 +7,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"google.golang.org/api/idtoken"
 
 	"github.com/jpfortier/gym-app/internal/auth"
 	"github.com/jpfortier/gym-app/internal/exercise"
+	"github.com/jpfortier/gym-app/internal/testutil"
 	"github.com/jpfortier/gym-app/internal/user"
 )
 
@@ -21,13 +21,8 @@ func TestExercisesList_returnsCategoriesAndVariants(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
+	u := testutil.CreateTestUser(t, db, ctx, "exercises")
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "exercises-" + uuid.New().String(), Email: "ex-" + uuid.New().String() + "@test.com", Name: "EX"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
-
 	exerciseRepo := exercise.NewRepo(db)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()

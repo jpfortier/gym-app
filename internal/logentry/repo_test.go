@@ -11,19 +11,13 @@ import (
 
 	"github.com/jpfortier/gym-app/internal/session"
 	"github.com/jpfortier/gym-app/internal/testutil"
-	"github.com/jpfortier/gym-app/internal/user"
 )
 
 func dbForTest(t *testing.T) *sql.DB { return testutil.DBForTest(t) }
 
 func seedSessionAndVariant(t *testing.T, db *sql.DB, ctx context.Context) (sessID, variantID uuid.UUID) {
 	t.Helper()
-	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "logentry-" + uuid.New().String(), Email: "le-" + uuid.New().String() + "@test.com", Name: "LE"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "logentry")
 
 	sessionRepo := session.NewRepo(db)
 	parsed, _ := time.Parse("2006-01-02", "2025-03-12")

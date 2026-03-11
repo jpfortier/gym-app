@@ -2,14 +2,13 @@ package session
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/jpfortier/gym-app/internal/user"
+	"github.com/jpfortier/gym-app/internal/testutil"
 )
 
 func TestService_GetOrCreateForDate_createsNew(t *testing.T) {
@@ -17,8 +16,7 @@ func TestService_GetOrCreateForDate_createsNew(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	u := createTestUser(t, db, ctx)
-	defer deleteTestUser(t, db, ctx, u.ID)
+	u := testutil.CreateTestUser(t, db, ctx, "svc-test")
 
 	svc := NewService(NewRepo(db))
 	sess, err := svc.GetOrCreateForDate(ctx, u.ID, "2025-03-09")
@@ -44,8 +42,7 @@ func TestService_GetOrCreateForDate_returnsExisting(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	u := createTestUser(t, db, ctx)
-	defer deleteTestUser(t, db, ctx, u.ID)
+	u := testutil.CreateTestUser(t, db, ctx, "svc-test")
 
 	repo := NewRepo(db)
 	svc := NewService(repo)
@@ -68,8 +65,7 @@ func TestService_GetOrCreateForDate_repoAndServiceIntegration(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	u := createTestUser(t, db, ctx)
-	defer deleteTestUser(t, db, ctx, u.ID)
+	u := testutil.CreateTestUser(t, db, ctx, "svc-test")
 
 	repo := NewRepo(db)
 	parsed, _ := time.Parse("2006-01-02", "2025-03-11")
@@ -93,8 +89,7 @@ func TestService_GetOrCreateForDate_invalidDate(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	u := createTestUser(t, db, ctx)
-	defer deleteTestUser(t, db, ctx, u.ID)
+	u := testutil.CreateTestUser(t, db, ctx, "svc-test")
 
 	svc := NewService(NewRepo(db))
 	_, err := svc.GetOrCreateForDate(ctx, u.ID, "not-a-date")
@@ -103,19 +98,3 @@ func TestService_GetOrCreateForDate_invalidDate(t *testing.T) {
 	}
 }
 
-func createTestUser(t *testing.T, db *sql.DB, ctx context.Context) *user.User {
-	t.Helper()
-	repo := user.NewRepo(db)
-	u := &user.User{GoogleID: "svc-test-" + uuid.New().String(), Email: "svc-" + uuid.New().String() + "@test.com", Name: "Svc Test"}
-	if err := repo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	return u
-}
-
-func deleteTestUser(t *testing.T, db *sql.DB, ctx context.Context, id uuid.UUID) {
-	t.Helper()
-	if _, err := db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", id); err != nil {
-		t.Log("cleanup delete user:", err)
-	}
-}
