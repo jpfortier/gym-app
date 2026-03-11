@@ -291,7 +291,11 @@ func (s *Service) runQueryHistory(ctx context.Context, userID uuid.UUID, argsJSO
 	for i, e := range res.Entries {
 		sets := make([]map[string]interface{}, len(e.Sets))
 		for j, set := range e.Sets {
-			sets[j] = map[string]interface{}{"weight": set.Weight, "reps": set.Reps, "set_type": set.SetType}
+			reps := set.Reps
+			if reps == 0 && set.Weight != nil && *set.Weight > 0 {
+				reps = 1
+			}
+			sets[j] = map[string]interface{}{"weight": set.Weight, "reps": reps, "set_type": set.SetType}
 		}
 		entries[i] = map[string]interface{}{
 			"session_date": e.SessionDate,

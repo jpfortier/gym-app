@@ -146,10 +146,14 @@ func (b *Builder) Build(ctx context.Context, userID uuid.UUID) (*WorkoutContext,
 			if i == 0 && dateStr == today {
 				ae := ActiveExercise{ID: e.ID.String(), Name: exName, Sets: nil}
 				for _, set := range e.Sets {
+					reps := set.Reps
+					if reps == 0 && set.Weight != nil && *set.Weight > 0 {
+						reps = 1
+					}
 					ae.Sets = append(ae.Sets, ActiveSet{
 						ID:     set.ID.String(),
 						Weight: set.Weight,
-						Reps:   set.Reps,
+						Reps:   reps,
 					})
 					lastSetID = set.ID.String()
 				}
@@ -167,7 +171,11 @@ func (b *Builder) Build(ctx context.Context, userID uuid.UUID) (*WorkoutContext,
 			} else {
 				re := RecentExercise{Name: exName, Sets: nil}
 				for _, set := range e.Sets {
-					re.Sets = append(re.Sets, RecentSet{Weight: set.Weight, Reps: set.Reps})
+					reps := set.Reps
+					if reps == 0 && set.Weight != nil && *set.Weight > 0 {
+						reps = 1
+					}
+					re.Sets = append(re.Sets, RecentSet{Weight: set.Weight, Reps: reps})
 					if lastSetID == "" && i == 0 {
 						lastSetID = set.ID.String()
 					}
