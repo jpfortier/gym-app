@@ -5,9 +5,14 @@ import (
 	"testing"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/joho/godotenv"
 
 	"github.com/jpfortier/gym-app/internal/env"
 )
+
+func init() {
+	_ = godotenv.Load()
+}
 
 // DBForTest returns a DB connection for tests. Fails if DB is unavailable.
 func DBForTest(t *testing.T) *sql.DB {

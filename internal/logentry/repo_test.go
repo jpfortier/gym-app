@@ -125,3 +125,83 @@ func TestRepo_Create_bodyweight(t *testing.T) {
 		t.Errorf("bodyweight set should have nil weight: got %+v", got)
 	}
 }
+
+func TestRepo_AppendSet(t *testing.T) {
+	db := dbForTest(t)
+	defer db.Close()
+	ctx := context.Background()
+	sessID, variantID := seedSessionAndVariant(t, db, ctx)
+
+	repo := NewRepo(db)
+	w := 135.0
+	entry := &LogEntry{SessionID: sessID, ExerciseVariantID: variantID, RawSpeech: "bench"}
+	if err := repo.Create(ctx, entry, []SetInput{{Weight: &w, Reps: 5, SetOrder: 1}}); err != nil {
+		t.Fatal(err)
+	}
+	w2 := 145.0
+	setID, err := repo.AppendSet(ctx, entry.ID, &w2, 6, "working")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if setID == uuid.Nil {
+		t.Error("expected non-nil set ID")
+	}
+	got, _ := repo.GetByID(ctx, entry.ID)
+	if len(got.Sets) != 2 {
+		t.Fatalf("expected 2 sets, got %d", len(got.Sets))
+	}
+	if got.Sets[1].Weight == nil || *got.Sets[1].Weight != 145 || got.Sets[1].Reps != 6 {
+		t.Errorf("expected second set 145x6, got %v x %d", got.Sets[1].Weight, got.Sets[1].Reps)
+	}
+}
+
+func TestRepo_DeleteSet(t *testing.T) {
+	db := dbForTest(t)
+	defer db.Close()
+	ctx := context.Background()
+	sessID, variantID := seedSessionAndVariant(t, db, ctx)
+
+	repo := NewRepo(db)
+	w := 135.0
+	entry := &LogEntry{SessionID: sessID, ExerciseVariantID: variantID, RawSpeech: "bench"}
+	if err := repo.Create(ctx, entry, []SetInput{{Weight: &w, Reps: 5, SetOrder: 1}}); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := repo.GetByID(ctx, entry.ID)
+	if len(got.Sets) == 0 {
+		t.Fatal("expected sets")
+	}
+	setID := got.Sets[0].ID
+	if err := repo.DeleteSet(ctx, setID); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := repo.GetByID(ctx, entry.ID)
+	if len(after.Sets) != 0 {
+		t.Errorf("expected 0 sets after delete, got %d", len(after.Sets))
+	}
+}
+
+func TestRepo_GetEntryIDBySetID(t *testing.T) {
+	db := dbForTest(t)
+	defer db.Close()
+	ctx := context.Background()
+	sessID, variantID := seedSessionAndVariant(t, db, ctx)
+
+	repo := NewRepo(db)
+	w := 135.0
+	entry := &LogEntry{SessionID: sessID, ExerciseVariantID: variantID, RawSpeech: "bench"}
+	if err := repo.Create(ctx, entry, []SetInput{{Weight: &w, Reps: 5, SetOrder: 1}}); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := repo.GetByID(ctx, entry.ID)
+	if len(got.Sets) == 0 {
+		t.Fatal("expected sets")
+	}
+	eid, err := repo.GetEntryIDBySetID(ctx, got.Sets[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if eid != entry.ID {
+		t.Errorf("expected entry ID %s, got %s", entry.ID, eid)
+	}
+}

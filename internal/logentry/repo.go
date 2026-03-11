@@ -252,6 +252,41 @@ func (r *Repo) GetMostRecentDisabledEntryForUser(ctx context.Context, userID uui
 	return &e, nil
 }
 
+func (r *Repo) GetEntryIDBySetID(ctx context.Context, setID uuid.UUID) (uuid.UUID, error) {
+	var entryID uuid.UUID
+	err := r.db.QueryRowContext(ctx,
+		`SELECT log_entry_id FROM log_entry_sets WHERE id = $1`,
+		setID,
+	).Scan(&entryID)
+	if err == sql.ErrNoRows {
+		return uuid.Nil, nil
+	}
+	return entryID, err
+}
+
+func (r *Repo) AppendSet(ctx context.Context, entryID uuid.UUID, weight *float64, reps int, setType string) (uuid.UUID, error) {
+	setID := uuid.Must(uuid.NewV7())
+	var maxOrder int
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COALESCE(MAX(set_order), 0) FROM log_entry_sets WHERE log_entry_id = $1`,
+		entryID,
+	).Scan(&maxOrder)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	_, err = r.db.ExecContext(ctx,
+		`INSERT INTO log_entry_sets (id, log_entry_id, weight, reps, set_order, set_type)
+		 VALUES ($1, $2, $3, $4, $5, $6)`,
+		setID, entryID, db.NullFloat64(weight), reps, maxOrder+1, db.NullStr(setType),
+	)
+	return setID, err
+}
+
+func (r *Repo) DeleteSet(ctx context.Context, setID uuid.UUID) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM log_entry_sets WHERE id = $1`, setID)
+	return err
+}
+
 func (r *Repo) UpdateSet(ctx context.Context, setID uuid.UUID, weight *float64, reps *int) error {
 	if weight != nil && reps != nil {
 		_, err := r.db.ExecContext(ctx,

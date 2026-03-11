@@ -90,6 +90,11 @@ Segment by segment. For each segment: implement → test → verify. Then integr
 
 ## Executor progress
 
+**LLM Handler DSL Upgrade (in progress):**
+- Query DSL backend: Done. `internal/query/service.go` — `Query()` with scopes (most_recent, best, aggregate, recent, session_detail, trend) and metrics (max_weight, latest_weight, max_reps, count_sets, count_sessions, total_volume, estimated_1rm). Tests added.
+- Command DSL backend: Done. New `internal/command/` package — Executor with ENSURE_SESSION, CREATE_EXERCISE_ENTRY, APPEND_SET, UPDATE_SET, DELETE_SET, RESTORE_ENTRY, SET_NAME, UPDATE_NAME, CREATE_NOTE. target_ref resolution (last_created_set, last_exercise). logentry.Repo: AppendSet, DeleteSet, GetEntryIDBySetID. Tests added.
+- Next: LLM tools (query_history, execute_commands), agent loop in chat service.
+
 Segments 1–6 done: Session repo+service, Log entry repo+service, Exercise repo+resolution. All tests pass. `make test` sources .env for GYM_DATABASE_URL.
 
 Admin panel: RequireAdmin middleware, cookie-based user picker, dashboard, users, sessions, session detail, PRs, usage, notes. Login page for browser auth. Tests for RequireAdmin (403 non-admin, 200 admin). Admin handler tests require DB.
