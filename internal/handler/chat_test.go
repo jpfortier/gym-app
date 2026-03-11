@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/api/idtoken"
@@ -17,24 +18,23 @@ import (
 	"github.com/jpfortier/gym-app/internal/auth"
 	"github.com/jpfortier/gym-app/internal/chat"
 	"github.com/jpfortier/gym-app/internal/chatmessages"
+	"github.com/jpfortier/gym-app/internal/command"
 	"github.com/jpfortier/gym-app/internal/correction"
 	"github.com/jpfortier/gym-app/internal/exercise"
 	"github.com/jpfortier/gym-app/internal/logentry"
 	"github.com/jpfortier/gym-app/internal/name"
+	"github.com/jpfortier/gym-app/internal/notes"
 	"github.com/jpfortier/gym-app/internal/pr"
 	"github.com/jpfortier/gym-app/internal/query"
 	"github.com/jpfortier/gym-app/internal/session"
 	"github.com/jpfortier/gym-app/internal/user"
 )
 
-// chatTestService builds the chat service stack with mock AI. chatMessagesRepo can be nil. parser can be nil for default.
-func chatTestService(t *testing.T, db *sql.DB, chatMessagesRepo *chatmessages.Repo, parser ai.Parser) *chat.Service {
+// chatTestService builds the chat service stack with mock AI. chatMessagesRepo can be nil.
+func chatTestService(t *testing.T, db *sql.DB, chatMessagesRepo *chatmessages.Repo) *chat.Service {
 	t.Helper()
 	throttle := ai.NewThrottlerFromEnv()
 	aiClient := ai.NewClient(throttle, nil)
-	if parser == nil {
-		parser = ai.NewParser(aiClient)
-	}
 	sessionRepo := session.NewRepo(db)
 	logentryRepo := logentry.NewRepo(db)
 	exerciseRepo := exercise.NewRepo(db)
@@ -45,19 +45,25 @@ func chatTestService(t *testing.T, db *sql.DB, chatMessagesRepo *chatmessages.Re
 	querySvc := query.NewService(exerciseRepo, logentryRepo, sessionRepo)
 	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
 	prSvc := pr.NewService(prRepo)
+	notesRepo := notes.NewRepo(db)
+	cmdExecutor := command.NewExecutor(
+		sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo,
+		user.NewRepo(db), name.NewHandler(aiClient), notesRepo, prSvc,
+	)
 	return chat.NewService(chat.Config{
-		Client: aiClient, Parser: parser, UserRepo: user.NewRepo(db), NameHandler: name.NewHandler(aiClient),
+		Client: aiClient, UserRepo: user.NewRepo(db), NameHandler: name.NewHandler(aiClient),
 		SessionSvc: sessionSvc, SessionRepo: sessionRepo,
 		LogentrySvc: logentrySvc, LogentryRepo: logentryRepo,
 		ExerciseSvc: exerciseSvc, ExerciseRepo: exerciseRepo, QuerySvc: querySvc, CorrectionSvc: correctionSvc,
-		PrSvc: prSvc, PrRepo: prRepo, NotesRepo: nil, ChatMessagesRepo: chatMessagesRepo, R2: nil,
+		PrSvc: prSvc, PrRepo: prRepo, NotesRepo: notesRepo, ChatMessagesRepo: chatMessagesRepo, R2: nil,
+		CommandExecutor: cmdExecutor,
 	})
 }
 
 // chatTestServer sets up a POST /chat handler with mock AI. chatMessagesRepo can be nil.
 func chatTestServer(t *testing.T, db *sql.DB, u *user.User, chatMessagesRepo *chatmessages.Repo) *http.ServeMux {
 	t.Helper()
-	chatSvc := chatTestService(t, db, chatMessagesRepo, nil)
+	chatSvc := chatTestService(t, db, chatMessagesRepo)
 	userRepo := user.NewRepo(db)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
@@ -93,8 +99,8 @@ func TestChat_logIntent(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
 		t.Fatal(err)
 	}
-	if out["intent"] != "log" {
-		t.Errorf("got intent %v, want log", out["intent"])
+	if msg, _ := out["message"].(string); msg == "" {
+		t.Errorf("expected message, got %v", out["message"])
 	}
 }
 
@@ -138,10 +144,7 @@ func TestChat_removeIntent(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
 		t.Fatal(err)
 	}
-	if out["intent"] != "remove" {
-		t.Errorf("got intent %v, want remove", out["intent"])
-	}
-	if out["message"] != "Scratched." {
+	if msg, _ := out["message"].(string); msg != "Scratched." {
 		t.Errorf("got message %v, want Scratched.", out["message"])
 	}
 
@@ -158,8 +161,8 @@ func TestChat_removeIntent(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
 		t.Fatal(err)
 	}
-	if out["intent"] != "restore" {
-		t.Errorf("got intent %v, want restore", out["intent"])
+	if msg, _ := out["message"].(string); msg != "Back in." {
+		t.Errorf("got message %v, want Back in.", out["message"])
 	}
 	if out["message"] != "Back in." {
 		t.Errorf("got message %v, want Back in.", out["message"])
@@ -203,42 +206,37 @@ func TestChat_contextStoresMessages(t *testing.T) {
 	}
 }
 
-type mockParser struct {
-	intent *ai.ParsedIntent
-}
-
-func (m *mockParser) Parse(ctx context.Context, userID uuid.UUID, text string, recentMessages []ai.ChatMessage, workoutContext string, userName string) (*ai.ParsedIntent, error) {
-	return m.intent, nil
-}
-
-func TestChat_needsConfirmationWhenAmbiguous(t *testing.T) {
+func TestChat_correctionWithSquat(t *testing.T) {
 	db := dbForTest(t)
 	defer db.Close()
 	ctx := context.Background()
 
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "chat-ambig-" + uuid.New().String(), Email: "ambig-" + uuid.New().String() + "@test.com", Name: "A"}
+	u := &user.User{GoogleID: "chat-corr-" + uuid.New().String(), Email: "corr-" + uuid.New().String() + "@test.com", Name: "C"}
 	if err := userRepo.Create(ctx, u); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
-	parser := &mockParser{
-		intent: &ai.ParsedIntent{
-			Intent:      "correction",
-			Category:    "squat",
-			Variant:     "standard",
-			TargetRef:   "last",
-			Changes:     &ai.ParsedCorrection{Weight: ptrFloat(205)},
-			Ambiguities: []string{"multiple_targets"},
-			UIText:      &ai.ParsedUIText{Preview: "Update your last squat to 205 lb."},
-		},
+	sessionRepo := session.NewRepo(db)
+	logentryRepo := logentry.NewRepo(db)
+	exerciseRepo := exercise.NewRepo(db)
+	variant, err := exerciseRepo.Resolve(ctx, u.ID, "squat", "standard")
+	if err != nil || variant == nil {
+		t.Fatal("need seeded squat:", err)
 	}
-	chatSvc := chatTestService(t, db, nil, parser)
-	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
-	mux := http.NewServeMux()
-	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(Chat(chatSvc))))
+	parsed, _ := time.Parse("2006-01-02", time.Now().Format("2006-01-02"))
+	sess := &session.Session{UserID: u.ID, Date: parsed}
+	if err := sessionRepo.Create(ctx, sess); err != nil {
+		t.Fatal(err)
+	}
+	w := 185.0
+	entry := &logentry.LogEntry{SessionID: sess.ID, ExerciseVariantID: variant.ID, RawSpeech: "squat"}
+	if err := logentryRepo.Create(ctx, entry, []logentry.SetInput{{Weight: &w, Reps: 5, SetOrder: 1}}); err != nil {
+		t.Fatal(err)
+	}
 
+	mux := chatTestServer(t, db, u, nil)
 	body, _ := json.Marshal(map[string]string{"text": "change the last squat to 205"})
 	req := httptest.NewRequest(http.MethodPost, "/chat", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer x")
@@ -253,11 +251,8 @@ func TestChat_needsConfirmationWhenAmbiguous(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
 		t.Fatal(err)
 	}
-	if out["needs_confirmation"] != true {
-		t.Errorf("got needs_confirmation %v, want true", out["needs_confirmation"])
-	}
-	if out["intent"] != "correction" {
-		t.Errorf("got intent %v, want correction", out["intent"])
+	if msg, _ := out["message"].(string); msg == "" {
+		t.Errorf("expected message for correction, got %v", out["message"])
 	}
 }
 
@@ -290,8 +285,8 @@ func TestChat_setName(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
 		t.Fatal(err)
 	}
-	if out["intent"] != "set_name" {
-		t.Errorf("got intent %v, want set_name", out["intent"])
+	if msg, _ := out["message"].(string); msg == "" {
+		t.Errorf("expected message for set_name, got %v", out["message"])
 	}
 	msg, _ := out["message"].(string)
 	if msg == "" {
@@ -313,7 +308,7 @@ func TestChat_logAndQuerySamplesFromAudio(t *testing.T) {
 	cases := []struct {
 		label       string
 		text        string
-		wantIntent  string
+		wantIntent  string // deprecated, used for description
 		description string
 	}{
 		{"Close Grip Bench Press", "Close Grip Bench Press, 130.", "log", "single exercise, close grip variant"},
@@ -356,12 +351,11 @@ func TestChat_logAndQuerySamplesFromAudio(t *testing.T) {
 			if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
 				t.Fatal(err)
 			}
-			gotIntent, _ := out["intent"].(string)
-			if gotIntent != tc.wantIntent {
-				t.Errorf("got intent %v, want %s", gotIntent, tc.wantIntent)
-			}
 			msg, _ := out["message"].(string)
-			t.Logf("text=%q → intent=%s message=%q (%s)", tc.text, gotIntent, msg, tc.description)
+			if msg == "" && tc.wantIntent != "unknown" {
+				t.Errorf("expected message for %q, got empty", tc.text)
+			}
+			t.Logf("text=%q → wantIntent=%s message=%q (%s)", tc.text, tc.wantIntent, msg, tc.description)
 		})
 	}
 }

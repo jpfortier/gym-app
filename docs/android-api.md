@@ -96,13 +96,11 @@ Or with audio:
 - `text` and `audio_base64` are mutually exclusive; send one
 - `audio_format` optional: `"m4a"`, `"webm"`, etc. Defaults to webm if omitted
 
-**Response:** Varies by intent. All responses include `intent` and usually `message`.
+**Response:** Unified shape. All responses include `message` (when applicable). Optional fields: `entries`, `history`, `prs`.
 
-**Log intent:**
 ```json
 {
-  "intent": "log",
-  "message": "Logged.",
+  "message": "Logged bench press **135×8** for today.",
   "entries": [
     {
       "exercise_name": "Bench Press",
@@ -111,6 +109,11 @@ Or with audio:
       "entry_id": "uuid"
     }
   ],
+  "history": {
+    "exercise_name": "Bench Press",
+    "variant_name": "standard",
+    "entries": [...]
+  },
   "prs": [
     {
       "id": "uuid",
@@ -123,69 +126,11 @@ Or with audio:
   ]
 }
 ```
-- `prs` present when new PR(s) detected
-- `message` may be `"Logged. N new PR(s)!"` when PRs created
 
-**Query intent:**
-```json
-{
-  "intent": "query",
-  "history": {
-    "exercise_name": "Bench Press",
-    "variant_name": "standard",
-    "entries": [
-      {
-        "session_date": "2025-03-08",
-        "raw_speech": "bench 135x8",
-        "sets": [
-          { "weight": 135, "reps": 8, "set_type": "working" }
-        ],
-        "created_at": "2025-03-08T14:30:00Z"
-      }
-    ]
-  }
-}
-```
-
-**Correction intent:**
-```json
-{
-  "intent": "correction",
-  "message": "Corrected."
-}
-```
-
-**Remove intent:**
-```json
-{
-  "intent": "remove",
-  "message": "Removed."
-}
-```
-
-**Restore intent:**
-```json
-{
-  "intent": "restore",
-  "message": "Brought back."
-}
-```
-
-**Note intent:**
-```json
-{
-  "intent": "note",
-  "message": "Noted."
-}
-```
-
-**Unknown intent:**
-```json
-{
-  "intent": "unknown",
-  "message": "I didn't understand. Try logging a workout, asking about your history, correcting a previous entry, or removing something."
-}
-```
+- **`message`** — Human-readable reply. May contain **Markdown** (bold, bullets, etc.). Clients should render it with a Markdown library (e.g. [Markwon](https://github.com/noties/Markwon) on Android).
+- **`entries`** — Present when exercises were logged.
+- **`history`** — Present when the user asked about past workouts.
+- **`prs`** — Present when new PR(s) were detected.
 
 **Example phrases:**
 - Log: "bench 135 for 8", "squats 185x5", "RDL 135 for 6"

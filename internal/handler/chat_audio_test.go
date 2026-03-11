@@ -39,7 +39,7 @@ func TestChat_audioSamples(t *testing.T) {
 	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM workout_sessions WHERE user_id = $1", u.ID) })
 	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
-	chatSvc := chatTestService(t, db, nil, nil)
+	chatSvc := chatTestService(t, db, nil)
 
 	// Resolve samples path: go test runs from package dir (internal/handler), so go up to module root
 	samplesDir := filepath.Join("..", "..", "samples", "audio")
@@ -69,7 +69,7 @@ func TestChat_audioSamples(t *testing.T) {
 				t.Fatalf("Process: %v", err)
 			}
 
-			t.Logf("file=%s intent=%s message=%s", name, resp.Intent, resp.Message)
+			t.Logf("file=%s message=%s", name, resp.Message)
 			if len(resp.Entries) > 0 {
 				for _, e := range resp.Entries {
 					t.Logf("  logged: %s / %s session=%s entry=%s", e.ExerciseName, e.VariantName, e.SessionDate, e.EntryID)

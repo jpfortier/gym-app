@@ -7,6 +7,7 @@ const (
 	AppendSet          = "APPEND_SET"
 	UpdateSet          = "UPDATE_SET"
 	DeleteSet          = "DELETE_SET"
+	DisableEntry       = "DISABLE_ENTRY"
 	RestoreEntry       = "RESTORE_ENTRY"
 	SetName            = "SET_NAME"
 	UpdateName         = "UPDATE_NAME"
@@ -72,6 +73,7 @@ type ExecutionResult struct {
 
 // PRInfo describes a new PR for the LLM to celebrate.
 type PRInfo struct {
+	ID       string  `json:"id"`
 	Exercise string  `json:"exercise"`
 	Variant  string  `json:"variant"`
 	Weight   float64 `json:"weight"`

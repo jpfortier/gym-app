@@ -32,7 +32,7 @@ func Chat(chatSvc *chat.Service) http.HandlerFunc {
 		resp, err := chatSvc.Process(r.Context(), u, req.Text, req.AudioBase64, req.AudioFormat)
 		if err != nil {
 			slog.Error("chat process failed", "err", err)
-			JSONError(w, "processing failed", "internal_error", http.StatusInternalServerError)
+			JSONError(w, "Processing failed", "internal_error", http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")

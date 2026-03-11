@@ -110,6 +110,8 @@ func (e *Executor) executeOne(ctx context.Context, userID uuid.UUID, cmd *Comman
 		return e.doUpdateSet(ctx, userID, cmd, refs)
 	case DeleteSet:
 		return e.doDeleteSet(ctx, userID, cmd, refs)
+	case DisableEntry:
+		return e.doDisableEntry(ctx, userID, cmd, refs, defaultDate)
 	case RestoreEntry:
 		return e.doRestoreEntry(ctx, userID, cmd, refs, defaultDate, result)
 	case SetName:
@@ -189,6 +191,7 @@ func (e *Executor) doCreateExerciseEntry(ctx context.Context, userID uuid.UUID, 
 				catName = cat.Name
 			}
 			result.PRs = append(result.PRs, PRInfo{
+				ID:       p.ID.String(),
 				Exercise: catName,
 				Variant:  variant.Name,
 				Weight:   p.Weight,
@@ -248,6 +251,43 @@ func (e *Executor) doDeleteSet(ctx context.Context, userID uuid.UUID, cmd *Comma
 	}
 	sid, _ := uuid.Parse(setID)
 	return e.logentryRepo.DeleteSet(ctx, sid)
+}
+
+func (e *Executor) doDisableEntry(ctx context.Context, userID uuid.UUID, cmd *Command, refs *refState, defaultDate string) error {
+	date := defaultDate
+	if refs.lastSessionDate != "" {
+		date = refs.lastSessionDate
+	}
+	var entry *logentry.LogEntry
+	if cmd.Exercise != "" {
+		variant := cmd.Variant
+		if variant == "" {
+			variant = "standard"
+		}
+		v, err := e.exerciseRepo.Resolve(ctx, userID, strings.ToLower(cmd.Exercise), strings.ToLower(variant))
+		if err != nil || v == nil {
+			return fmt.Errorf("resolve exercise: %w", err)
+		}
+		entries, err := e.logentryRepo.ListByUserAndVariantWithDateRange(ctx, userID, v.ID, date, date, 1)
+		if err != nil || len(entries) == 0 {
+			return fmt.Errorf("nothing to scratch")
+		}
+		entry = entries[0]
+	} else {
+		var err error
+		entry, err = e.logentryRepo.GetMostRecentEntryForUser(ctx, userID, date)
+		if err != nil || entry == nil {
+			return fmt.Errorf("nothing to scratch")
+		}
+	}
+	ok, err := e.logentryRepo.DisableEntry(ctx, entry.ID, userID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("could not disable entry")
+	}
+	return nil
 }
 
 func (e *Executor) doRestoreEntry(ctx context.Context, userID uuid.UUID, cmd *Command, refs *refState, defaultDate string, result *ExecutionResult) error {

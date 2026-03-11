@@ -13,6 +13,7 @@ import (
 	"github.com/jpfortier/gym-app/internal/auth"
 	"github.com/jpfortier/gym-app/internal/chat"
 	"github.com/jpfortier/gym-app/internal/chatmessages"
+	"github.com/jpfortier/gym-app/internal/command"
 	"github.com/jpfortier/gym-app/internal/correction"
 	"github.com/jpfortier/gym-app/internal/db"
 	"github.com/jpfortier/gym-app/internal/env"
@@ -86,14 +87,16 @@ func NewServer(ctx context.Context) (*Server, error) {
 	throttle := ai.NewThrottlerFromEnv()
 	aiClient := ai.NewClient(throttle, usageRepo)
 	exerciseSvc := exercise.NewService(exerciseRepo, aiClient)
-	parser := ai.NewParser(aiClient)
 	r2, err := storage.NewR2()
 	if err != nil {
 		return nil, fmt.Errorf("R2 init: %w", err)
 	}
+	cmdExecutor := command.NewExecutor(
+		sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo,
+		userRepo, name.NewHandler(aiClient), notesRepo, prSvc,
+	)
 	chatSvc := chat.NewService(chat.Config{
 		Client:           aiClient,
-		Parser:           parser,
 		UserRepo:         userRepo,
 		NameHandler:      name.NewHandler(aiClient),
 		SessionSvc:       sessionSvc,
@@ -109,6 +112,7 @@ func NewServer(ctx context.Context) (*Server, error) {
 		NotesRepo:        notesRepo,
 		ChatMessagesRepo: chatMessagesRepo,
 		R2:               r2,
+		CommandExecutor:  cmdExecutor,
 	})
 
 	googleClientID := env.GoogleClientID()
