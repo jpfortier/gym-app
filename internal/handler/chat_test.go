@@ -164,9 +164,6 @@ func TestChat_removeIntent(t *testing.T) {
 	if msg, _ := out["message"].(string); msg != "Back in." {
 		t.Errorf("got message %v, want Back in.", out["message"])
 	}
-	if out["message"] != "Back in." {
-		t.Errorf("got message %v, want Back in.", out["message"])
-	}
 }
 
 func TestChat_contextStoresMessages(t *testing.T) {

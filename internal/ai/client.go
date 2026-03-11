@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -179,24 +180,33 @@ func (c *Client) chatWithToolsMock(messages []ChatMessage, tools []openai.Tool) 
 				}
 			}
 			if name != "" {
+				args, _ := json.Marshal(map[string]interface{}{
+					"commands":        []map[string]string{{"type": "SET_NAME", "name": name}},
+					"success_message": "Alright " + name + ", let's get started.",
+				})
 				return "", []openai.ToolCall{{
 					ID:   "call_mock_name",
 					Type: openai.ToolTypeFunction,
 					Function: openai.FunctionCall{
 						Name:      "execute_commands",
-						Arguments: fmt.Sprintf(`{"commands":[{"type":"SET_NAME","name":"%s"}],"success_message":"Alright %s, let's get started."}`, name, name),
+						Arguments: string(args),
 					},
 				}}, nil
 			}
 		}
 		words := strings.Fields(lastContent)
 		if len(words) == 1 && len(words[0]) > 1 && !strings.ContainsAny(words[0], "0123456789") && !map[string]bool{"bench": true, "squat": true, "deadlift": true}[strings.ToLower(words[0])] {
+			n := words[0]
+			args, _ := json.Marshal(map[string]interface{}{
+				"commands":        []map[string]string{{"type": "SET_NAME", "name": n}},
+				"success_message": "Alright " + n + ", let's get started.",
+			})
 			return "", []openai.ToolCall{{
 				ID:   "call_mock_name",
 				Type: openai.ToolTypeFunction,
 				Function: openai.FunctionCall{
 					Name:      "execute_commands",
-					Arguments: fmt.Sprintf(`{"commands":[{"type":"SET_NAME","name":"%s"}],"success_message":"Alright %s, let's get started."}`, words[0], words[0]),
+					Arguments: string(args),
 				},
 			}}, nil
 		}

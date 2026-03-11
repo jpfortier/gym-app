@@ -199,11 +199,12 @@ func (s *Service) Process(ctx context.Context, u *user.User, text string, audioB
 		for _, tc := range toolCalls {
 			var result string
 			if tc.Function.Name == "query_history" {
-				r, err := s.runQueryHistory(ctx, userID, tc.Function.Arguments)
+				hist, r, err := s.runQueryHistory(ctx, userID, tc.Function.Arguments)
 				if err != nil {
 					result = "error: " + err.Error()
 				} else {
 					result = r
+					finalHistory = hist
 				}
 			} else if tc.Function.Name == "execute_commands" {
 				execResult, entries, prs, err := s.runExecuteCommands(ctx, userID, wc, tc.Function.Arguments)
@@ -247,7 +248,7 @@ func (s *Service) Process(ctx context.Context, u *user.User, text string, audioB
 	return resp, nil
 }
 
-func (s *Service) runQueryHistory(ctx context.Context, userID uuid.UUID, argsJSON string) (string, error) {
+func (s *Service) runQueryHistory(ctx context.Context, userID uuid.UUID, argsJSON string) (*HistoryResult, string, error) {
 	var args struct {
 		Category  string `json:"category"`
 		Variant   string `json:"variant"`
@@ -258,10 +259,10 @@ func (s *Service) runQueryHistory(ctx context.Context, userID uuid.UUID, argsJSO
 		Limit     int    `json:"limit"`
 	}
 	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
-		return "", err
+		return nil, "", err
 	}
 	if args.Category == "" {
-		return "", fmt.Errorf("category required")
+		return nil, "", fmt.Errorf("category required")
 	}
 	if args.Variant == "" {
 		args.Variant = "standard"
@@ -280,13 +281,32 @@ func (s *Service) runQueryHistory(ctx context.Context, userID uuid.UUID, argsJSO
 	}
 	res, err := s.querySvc.Query(ctx, userID, params)
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
+	emptyHist := &HistoryResult{ExerciseName: "", VariantName: "", Entries: []interface{}{}}
 	if res == nil {
-		return `{"exercise_name":"","variant_name":"","entries":[],"message":"Nothing logged for that yet."}`, nil
+		return emptyHist, `{"exercise_name":"","variant_name":"","entries":[],"message":"Nothing logged for that yet."}`, nil
+	}
+	entries := make([]interface{}, len(res.Entries))
+	for i, e := range res.Entries {
+		sets := make([]map[string]interface{}, len(e.Sets))
+		for j, set := range e.Sets {
+			sets[j] = map[string]interface{}{"weight": set.Weight, "reps": set.Reps, "set_type": set.SetType}
+		}
+		entries[i] = map[string]interface{}{
+			"session_date": e.SessionDate,
+			"raw_speech":   e.RawSpeech,
+			"sets":         sets,
+			"created_at":   e.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+	}
+	hist := &HistoryResult{
+		ExerciseName: res.ExerciseName,
+		VariantName:  res.VariantName,
+		Entries:      entries,
 	}
 	out, _ := json.Marshal(res)
-	return string(out), nil
+	return hist, string(out), nil
 }
 
 func (s *Service) runExecuteCommands(ctx context.Context, userID uuid.UUID, wc *workoutcontext.WorkoutContext, argsJSON string) (*command.ExecutionResult, []LogResult, []PRResult, error) {
