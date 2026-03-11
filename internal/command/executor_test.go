@@ -163,6 +163,9 @@ func TestExecutor_AppendSet(t *testing.T) {
 	if len(updated.Sets) >= 2 && (updated.Sets[1].Weight == nil || *updated.Sets[1].Weight != 205) {
 		t.Errorf("expected second set 205x3, got %v", updated.Sets[1])
 	}
+	if len(result.PRs) == 0 {
+		t.Error("expected PR when appending heavier set (205x3 beats 185x5)")
+	}
 }
 
 func TestExecutor_UpdateSet(t *testing.T) {

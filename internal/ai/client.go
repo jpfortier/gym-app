@@ -61,6 +61,7 @@ func (c *Client) Transcribe(ctx context.Context, userID uuid.UUID, audioBase64 s
 		Model:    openai.Whisper1,
 		FilePath: "audio." + fileExt,
 		Reader:   bytes.NewReader(data),
+		Format:   openai.AudioResponseFormatVerboseJSON,
 	}
 	resp, err := c.client.CreateTranscription(ctx, req)
 	if err != nil {

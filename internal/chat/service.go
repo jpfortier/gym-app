@@ -198,7 +198,15 @@ func (s *Service) Process(ctx context.Context, u *user.User, text string, audioB
 
 		for _, tc := range toolCalls {
 			var result string
-			if tc.Function.Name == "query_history" {
+			if tc.Function.Name == "reply_from_context" {
+				var args struct {
+					Message string `json:"message"`
+				}
+				if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err == nil && args.Message != "" {
+					finalMessage = args.Message
+				}
+				result = "ok"
+			} else if tc.Function.Name == "query_history" {
 				hist, r, err := s.runQueryHistory(ctx, userID, tc.Function.Arguments)
 				if err != nil {
 					result = "error: " + err.Error()
@@ -218,6 +226,7 @@ func (s *Service) Process(ctx context.Context, u *user.User, text string, audioB
 						result = string(prJSON) + "\n\nFormat a celebratory message for these PRs."
 					} else if args := parseExecuteArgs(tc.Function.Arguments); args != nil && args.SuccessMessage != "" {
 						result = "success: " + args.SuccessMessage
+						finalMessage = args.SuccessMessage
 					} else {
 						result = "success"
 					}
@@ -232,6 +241,9 @@ func (s *Service) Process(ctx context.Context, u *user.User, text string, audioB
 				Content:    result,
 				ToolCallID: tc.ID,
 			})
+		}
+		if finalMessage != "" {
+			break
 		}
 	}
 
@@ -314,6 +326,7 @@ func (s *Service) runQueryHistory(ctx context.Context, userID uuid.UUID, argsJSO
 }
 
 func (s *Service) runExecuteCommands(ctx context.Context, userID uuid.UUID, wc *workoutcontext.WorkoutContext, argsJSON string) (*command.ExecutionResult, []LogResult, []PRResult, error) {
+	slog.Debug("execute_commands", "args", argsJSON)
 	var args executeArgs
 	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
 		return nil, nil, nil, err

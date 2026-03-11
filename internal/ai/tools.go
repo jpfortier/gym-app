@@ -5,14 +5,28 @@ import (
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
-// ChatTools returns the tools for the workout agent (query_history, execute_commands).
+// ChatTools returns the tools for the workout agent.
 func ChatTools() []openai.Tool {
 	return []openai.Tool{
 		{
 			Type: openai.ToolTypeFunction,
 			Function: &openai.FunctionDefinition{
+				Name:        "reply_from_context",
+				Description: "Use when you can answer the user's question from the workout context. Read-only, inert—no data changes. Use for questions like 'what did I do today?', 'what's my last bench?'. Do NOT use for logging, corrections, or any mutations—use execute_commands for those.",
+				Parameters: jsonschema.Definition{
+					Type: jsonschema.Object,
+					Properties: map[string]jsonschema.Definition{
+						"message": {Type: jsonschema.String, Description: "Your response to the user. Use Markdown: **bold** for numbers/weights."},
+					},
+					Required: []string{"message"},
+				},
+			},
+		},
+		{
+			Type: openai.ToolTypeFunction,
+			Function: &openai.FunctionDefinition{
 				Name:        "query_history",
-				Description: "Fetch exercise history when the user's question cannot be answered from the workout context. Use when they ask about data outside the last 8 sessions, or for specific metrics (max weight, 1RM, total volume, etc.).",
+				Description: "Fetch exercise history when the user's question cannot be answered from the workout context. Use when they ask about data outside the last 8 sessions, or for specific metrics (max weight, 1RM, total volume, etc.). Read-only.",
 				Parameters: jsonschema.Definition{
 					Type: jsonschema.Object,
 					Properties: map[string]jsonschema.Definition{
