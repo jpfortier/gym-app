@@ -15,13 +15,13 @@ func PRsList(prRepo *pr.Repo, exerciseRepo *exercise.Repo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := auth.UserFromContext(r.Context())
 		if u == nil {
-			JSONError(w, "unauthorized", "unauthorized", http.StatusUnauthorized)
+			JSONError(w, r, "unauthorized", "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		prs, err := prRepo.ListByUser(r.Context(), u.ID)
 		if err != nil {
-			JSONError(w, "internal error", "internal_error", http.StatusInternalServerError)
+			JSONError(w, r, "internal error", "internal_error", http.StatusInternalServerError)
 			return
 		}
 
@@ -61,39 +61,39 @@ func PRImage(prRepo *pr.Repo, r2 *storage.R2) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := auth.UserFromContext(r.Context())
 		if u == nil {
-			JSONError(w, "unauthorized", "unauthorized", http.StatusUnauthorized)
+			JSONError(w, r, "unauthorized", "unauthorized", http.StatusUnauthorized)
 			return
 		}
 		idStr := r.PathValue("id")
 		if idStr == "" {
-			JSONError(w, "id required", "invalid_input", http.StatusBadRequest)
+			JSONError(w, r, "id required", "invalid_input", http.StatusBadRequest)
 			return
 		}
 		id, err := uuid.Parse(idStr)
 		if err != nil {
-			JSONError(w, "invalid id", "invalid_input", http.StatusBadRequest)
+			JSONError(w, r, "invalid id", "invalid_input", http.StatusBadRequest)
 			return
 		}
 		prRec, err := prRepo.GetByID(r.Context(), id)
 		if err != nil || prRec == nil {
-			JSONError(w, "not found", "not_found", http.StatusNotFound)
+			JSONError(w, r, "not found", "not_found", http.StatusNotFound)
 			return
 		}
 		if prRec.UserID != u.ID {
-			JSONError(w, "not found", "not_found", http.StatusNotFound)
+			JSONError(w, r, "not found", "not_found", http.StatusNotFound)
 			return
 		}
 		if prRec.ImageURL == "" {
-			JSONError(w, "image not ready", "not_found", http.StatusNotFound)
+			JSONError(w, r, "image not ready", "not_found", http.StatusNotFound)
 			return
 		}
 		if r2 == nil {
-			JSONError(w, "storage not configured", "internal_error", http.StatusServiceUnavailable)
+			JSONError(w, r, "storage not configured", "internal_error", http.StatusServiceUnavailable)
 			return
 		}
 		url, err := r2.PresignPRImage(r.Context(), u.ID, id, 3600)
 		if err != nil {
-			JSONError(w, "failed to generate URL", "internal_error", http.StatusInternalServerError)
+			JSONError(w, r, "failed to generate URL", "internal_error", http.StatusInternalServerError)
 			return
 		}
 		http.Redirect(w, r, url, http.StatusFound)

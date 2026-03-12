@@ -19,6 +19,7 @@ import (
 	"github.com/jpfortier/gym-app/internal/notes"
 	"github.com/jpfortier/gym-app/internal/pr"
 	"github.com/jpfortier/gym-app/internal/session"
+	"github.com/jpfortier/gym-app/internal/systemlog"
 	"github.com/jpfortier/gym-app/internal/testutil"
 	"github.com/jpfortier/gym-app/internal/usage"
 	"github.com/jpfortier/gym-app/internal/user"
@@ -54,16 +55,17 @@ func setupAdminTest(t *testing.T) (db *sql.DB, adminUser *user.User, h *Handler,
 		UserRepo:          userRepo,
 		SessionRepo:       session.NewRepo(db),
 		LogentryRepo:      logentry.NewRepo(db),
-		ExerciseRepo:     exercise.NewRepo(db),
+		ExerciseRepo:      exercise.NewRepo(db),
 		PrRepo:            pr.NewRepo(db),
 		UsageRepo:         usage.NewRepo(db),
 		NotesRepo:         notes.NewRepo(db),
 		ChatMessagesRepo:  chatmessages.NewRepo(db),
+		SystemlogRepo:     systemlog.NewRepo(db),
 		Templates:         tpl,
 	}
 
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: adminUser.GoogleID}}
-	requireAdmin := auth.RequireAdmin(verifier, userRepo, "aud")
+	requireAdmin := auth.RequireAdmin(verifier, userRepo, "aud", nil)
 	adminWithCookie := InjectAuthCookie(requireAdmin)
 
 	mux = http.NewServeMux()
@@ -74,6 +76,7 @@ func setupAdminTest(t *testing.T) (db *sql.DB, adminUser *user.User, h *Handler,
 	mux.Handle("GET /admin/prs", adminWithCookie(http.HandlerFunc(h.PRs)))
 	mux.Handle("GET /admin/usage", adminWithCookie(http.HandlerFunc(h.Usage)))
 	mux.Handle("GET /admin/notes", adminWithCookie(http.HandlerFunc(h.Notes)))
+	mux.Handle("GET /admin/logs", adminWithCookie(http.HandlerFunc(h.Logs)))
 	mux.Handle("POST /admin/select-user", adminWithCookie(http.HandlerFunc(h.SelectUser)))
 
 	cleanup = func() { db.Close() }
@@ -544,6 +547,22 @@ func TestAdmin_Notes_withSelectedUser_showsNotes(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "warm up hamstrings") {
 		t.Error("expected note content in response")
+	}
+}
+
+func TestAdmin_Logs_returnsPage(t *testing.T) {
+	_, _, _, mux, cleanup := setupAdminTest(t)
+	defer cleanup()
+
+	req := authReq(httptest.NewRequest(http.MethodGet, "/admin/logs", nil), "x")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("got status %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "System Logs") {
+		t.Error("expected System Logs in response")
 	}
 }
 

@@ -1,0 +1,52 @@
+{{define "logs"}}
+<h2>System Logs</h2>
+<form method="get" action="/admin/logs" style="margin-bottom: 1rem;">
+  <label>Category:
+    <select name="category">
+      <option value="">— All —</option>
+      <option value="auth_success" {{if eq (index .Data "Category") "auth_success"}}selected{{end}}>auth_success</option>
+      <option value="auth_failure" {{if eq (index .Data "Category") "auth_failure"}}selected{{end}}>auth_failure</option>
+      <option value="action" {{if eq (index .Data "Category") "action"}}selected{{end}}>action</option>
+      <option value="ai" {{if eq (index .Data "Category") "ai"}}selected{{end}}>ai</option>
+      <option value="exception" {{if eq (index .Data "Category") "exception"}}selected{{end}}>exception</option>
+    </select>
+  </label>
+  <label>User:
+    <select name="user_id">
+      <option value="">— All —</option>
+      {{$filterUID := index .Data "UserID"}}
+      {{range .Users}}
+      <option value="{{.ID}}" {{if eq $filterUID .ID.String}}selected{{end}}>{{.Email}}</option>
+      {{end}}
+    </select>
+  </label>
+  <button type="submit">Filter</button>
+</form>
+{{$err := index .Data "Error"}}
+{{if $err}}
+<p style="color: red;">{{$err}}</p>
+{{end}}
+{{$logs := index .Data "Logs"}}
+{{if $logs}}
+<table>
+  <thead>
+    <tr><th>Time</th><th>Category</th><th>User</th><th>Method</th><th>Path</th><th>Details</th><th>Error</th></tr>
+  </thead>
+  <tbody>
+    {{range $logs}}
+    <tr>
+      <td>{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
+      <td>{{.Category}}</td>
+      <td>{{if .UserID}}{{.UserID}}{{else}}—{{end}}</td>
+      <td>{{.Method}}</td>
+      <td>{{.Path}}</td>
+      <td>{{if .Details}}{{printf "%v" .Details}}{{else}}—{{end}}</td>
+      <td>{{if .Error}}{{.Error}}{{else}}—{{end}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{else}}
+<p>No logs.</p>
+{{end}}
+{{end}}

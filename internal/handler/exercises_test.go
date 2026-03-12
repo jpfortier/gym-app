@@ -26,7 +26,7 @@ func TestExercisesList_returnsCategoriesAndVariants(t *testing.T) {
 	exerciseRepo := exercise.NewRepo(db)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
-	mux.Handle("GET /exercises", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(ExercisesList(exerciseRepo))))
+	mux.Handle("GET /exercises", auth.RequireAuth(verifier, userRepo, "aud", nil)(http.HandlerFunc(ExercisesList(exerciseRepo))))
 
 	req := httptest.NewRequest(http.MethodGet, "/exercises", nil)
 	req.Header.Set("Authorization", "Bearer x")

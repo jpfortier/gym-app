@@ -26,6 +26,7 @@ import (
 	"github.com/jpfortier/gym-app/internal/query"
 	"github.com/jpfortier/gym-app/internal/session"
 	"github.com/jpfortier/gym-app/internal/storage"
+	"github.com/jpfortier/gym-app/internal/systemlog"
 	"github.com/jpfortier/gym-app/internal/usage"
 	"github.com/jpfortier/gym-app/internal/user"
 )
@@ -59,8 +60,9 @@ func (s *userStoreWithWelcome) UpdateGoogleID(ctx context.Context, userID uuid.U
 
 // Server holds the HTTP server and dependencies.
 type Server struct {
-	mux *http.ServeMux
-	db  *sql.DB
+	mux    *http.ServeMux
+	handler http.Handler
+	db     *sql.DB
 }
 
 // NewServer wires dependencies and returns a Server. Call Run() to start.
@@ -95,6 +97,8 @@ func NewServer(ctx context.Context) (*Server, error) {
 		sessionSvc, logentrySvc, logentryRepo, exerciseSvc, exerciseRepo,
 		userRepo, name.NewHandler(aiClient), notesRepo, prSvc,
 	)
+	syslogRepo := systemlog.NewRepo(database)
+	syslog := systemlog.NewRepoLogger(syslogRepo)
 	chatSvc := chat.NewService(chat.Config{
 		Client:           aiClient,
 		UserRepo:         userRepo,
@@ -113,25 +117,33 @@ func NewServer(ctx context.Context) (*Server, error) {
 		ChatMessagesRepo: chatMessagesRepo,
 		R2:               r2,
 		CommandExecutor:  cmdExecutor,
+		Systemlog:        syslog,
 	})
 
 	googleClientID := env.GoogleClientID()
 	verifier := auth.GoogleVerifier{}
 	userStore := &userStoreWithWelcome{userRepo: userRepo, chatMessagesRepo: chatMessagesRepo}
 
+	userIDFromContext := func(ctx context.Context) *uuid.UUID {
+		if u := auth.UserFromContext(ctx); u != nil {
+			return &u.ID
+		}
+		return nil
+	}
+	logAction := systemlog.LogAction(syslog, userIDFromContext)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", handler.Health(database))
 	mux.HandleFunc("GET /dev/token", handler.DevToken)
-	mux.Handle("GET /me", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.Me)))
-	mux.Handle("GET /chat/messages", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.ChatMessages(chatMessagesRepo))))
-	mux.Handle("POST /chat", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.Chat(chatSvc))))
-	mux.Handle("GET /sessions", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.SessionsList(sessionRepo))))
-	mux.Handle("GET /sessions/{id}", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.SessionDetail(sessionRepo, logentryRepo, exerciseRepo))))
-	mux.Handle("GET /exercises", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.ExercisesList(exerciseRepo))))
-	mux.Handle("GET /query", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.QueryHistory(queryService, exerciseRepo))))
-	mux.Handle("GET /prs", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.PRsList(prRepo, exerciseRepo))))
+	mux.Handle("GET /me", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.Me))))
+	mux.Handle("GET /chat/messages", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.ChatMessages(chatMessagesRepo)))))
+	mux.Handle("POST /chat", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.Chat(chatSvc)))))
+	mux.Handle("GET /sessions", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.SessionsList(sessionRepo)))))
+	mux.Handle("GET /sessions/{id}", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.SessionDetail(sessionRepo, logentryRepo, exerciseRepo)))))
+	mux.Handle("GET /exercises", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.ExercisesList(exerciseRepo)))))
+	mux.Handle("GET /query", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.QueryHistory(queryService, exerciseRepo)))))
+	mux.Handle("GET /prs", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.PRsList(prRepo, exerciseRepo)))))
 	if r2 != nil {
-		mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userStore, googleClientID)(http.HandlerFunc(handler.PRImage(prRepo, r2))))
+		mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.PRImage(prRepo, r2)))))
 	}
 
 	adminTpl, err := admin.LoadTemplates()
@@ -147,23 +159,26 @@ func NewServer(ctx context.Context) (*Server, error) {
 		UsageRepo:        usageRepo,
 		NotesRepo:        notesRepo,
 		ChatMessagesRepo: chatMessagesRepo,
+		SystemlogRepo:    syslogRepo,
 		Templates:        adminTpl,
 	}
-	requireAdmin := auth.RequireAdmin(verifier, userStore, googleClientID)
+	requireAdmin := auth.RequireAdmin(verifier, userStore, googleClientID, syslog)
 	adminWithCookie := admin.InjectAuthCookie(requireAdmin)
 
 	mux.HandleFunc("GET /admin/login", adminHandler.Login)
 	mux.HandleFunc("POST /admin/login", adminHandler.Login)
-	mux.Handle("POST /admin/select-user", adminWithCookie(http.HandlerFunc(adminHandler.SelectUser)))
-	mux.Handle("GET /admin", adminWithCookie(http.HandlerFunc(adminHandler.Dashboard)))
-	mux.Handle("GET /admin/users", adminWithCookie(http.HandlerFunc(adminHandler.Users)))
-	mux.Handle("GET /admin/sessions", adminWithCookie(http.HandlerFunc(adminHandler.Sessions)))
-	mux.Handle("GET /admin/sessions/{id}", adminWithCookie(http.HandlerFunc(adminHandler.SessionDetail)))
-	mux.Handle("GET /admin/prs", adminWithCookie(http.HandlerFunc(adminHandler.PRs)))
-	mux.Handle("GET /admin/usage", adminWithCookie(http.HandlerFunc(adminHandler.Usage)))
-	mux.Handle("GET /admin/notes", adminWithCookie(http.HandlerFunc(adminHandler.Notes)))
+	mux.Handle("POST /admin/select-user", adminWithCookie(logAction(http.HandlerFunc(adminHandler.SelectUser))))
+	mux.Handle("GET /admin", adminWithCookie(logAction(http.HandlerFunc(adminHandler.Dashboard))))
+	mux.Handle("GET /admin/users", adminWithCookie(logAction(http.HandlerFunc(adminHandler.Users))))
+	mux.Handle("GET /admin/sessions", adminWithCookie(logAction(http.HandlerFunc(adminHandler.Sessions))))
+	mux.Handle("GET /admin/sessions/{id}", adminWithCookie(logAction(http.HandlerFunc(adminHandler.SessionDetail))))
+	mux.Handle("GET /admin/prs", adminWithCookie(logAction(http.HandlerFunc(adminHandler.PRs))))
+	mux.Handle("GET /admin/usage", adminWithCookie(logAction(http.HandlerFunc(adminHandler.Usage))))
+	mux.Handle("GET /admin/notes", adminWithCookie(logAction(http.HandlerFunc(adminHandler.Notes))))
+	mux.Handle("GET /admin/logs", adminWithCookie(logAction(http.HandlerFunc(adminHandler.Logs))))
 
-	return &Server{mux: mux, db: database}, nil
+	handler := systemlog.RecoverPanic(syslog)(systemlog.AddLoggerToContext(syslog)(mux))
+	return &Server{mux: mux, handler: handler, db: database}, nil
 }
 
 // Run starts the HTTP server. Blocks until error.
@@ -177,10 +192,14 @@ func (s *Server) Run() error {
 	addr := ":" + port
 	certFile := env.TLSCertFile()
 	keyFile := env.TLSKeyFile()
+	h := s.handler
+	if h == nil {
+		h = s.mux
+	}
 	if certFile != "" && keyFile != "" {
 		log.Printf("Listening on https://%s", addr)
-		return http.ListenAndServeTLS(addr, certFile, keyFile, s.mux)
+		return http.ListenAndServeTLS(addr, certFile, keyFile, h)
 	}
 	log.Printf("Listening on http://%s", addr)
-	return http.ListenAndServe(addr, s.mux)
+	return http.ListenAndServe(addr, h)
 }

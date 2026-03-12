@@ -23,6 +23,7 @@ import (
 	"github.com/jpfortier/gym-app/internal/query"
 	"github.com/jpfortier/gym-app/internal/session"
 	"github.com/jpfortier/gym-app/internal/storage"
+	"github.com/jpfortier/gym-app/internal/systemlog"
 	"github.com/jpfortier/gym-app/internal/user"
 	"github.com/jpfortier/gym-app/internal/workoutcontext"
 )
@@ -76,6 +77,7 @@ type Config struct {
 	ChatMessagesRepo  *chatmessages.Repo
 	R2                *storage.R2
 	CommandExecutor   *command.Executor
+	Systemlog         systemlog.Logger
 }
 
 type Service struct {
@@ -97,6 +99,7 @@ type Service struct {
 	r2                *storage.R2
 	workoutCtxBuilder  *workoutcontext.Builder
 	commandExecutor   *command.Executor
+	systemlog         systemlog.Logger
 }
 
 func NewService(cfg Config) *Service {
@@ -123,6 +126,7 @@ func NewService(cfg Config) *Service {
 		r2:                cfg.R2,
 		workoutCtxBuilder: wcBuilder,
 		commandExecutor:   cfg.CommandExecutor,
+		systemlog:         cfg.Systemlog,
 	}
 }
 
@@ -131,14 +135,40 @@ func NewService(cfg Config) *Service {
 func (s *Service) Process(ctx context.Context, u *user.User, text string, audioBase64 string, audioFormat string) (*Response, error) {
 	userID := u.ID
 	if text == "" && audioBase64 != "" {
+		if s.systemlog != nil {
+			s.systemlog.Log(ctx, systemlog.InsertParams{
+				Category: systemlog.CategoryAI,
+				UserID:   &userID,
+				Details:   map[string]interface{}{"op": "transcribe", "has_audio": true},
+			})
+		}
 		var err error
 		text, err = s.client.Transcribe(ctx, userID, audioBase64, audioFormat)
 		if err != nil {
+			if s.systemlog != nil {
+				s.systemlog.Log(ctx, systemlog.InsertParams{
+					Category: systemlog.CategoryAI,
+					UserID:   &userID,
+					Details:   map[string]interface{}{"op": "transcribe", "error": err.Error()},
+					Error:     err.Error(),
+				})
+			}
 			return nil, fmt.Errorf("transcribe: %w", err)
 		}
 	}
 	if strings.TrimSpace(text) == "" {
 		return &Response{Message: "Didn't catch that — try again?"}, nil
+	}
+	if s.systemlog != nil {
+		trunc := text
+		if len(trunc) > 200 {
+			trunc = trunc[:200] + "..."
+		}
+		s.systemlog.Log(ctx, systemlog.InsertParams{
+			Category: systemlog.CategoryAI,
+			UserID:   &userID,
+			Details:  map[string]interface{}{"op": "chat_start", "input_preview": trunc},
+		})
 	}
 
 	var wc *workoutcontext.WorkoutContext
@@ -178,6 +208,24 @@ func (s *Service) Process(ctx context.Context, u *user.User, text string, audioB
 
 	for iter := 0; iter < maxIterations; iter++ {
 		content, toolCalls, err := s.client.ChatWithToolsRaw(ctx, userID, openaiMsgs, tools)
+		if s.systemlog != nil {
+			details := map[string]interface{}{"op": "chat_llm", "iteration": iter + 1}
+			if err != nil {
+				details["error"] = err.Error()
+			} else if len(toolCalls) > 0 {
+				toolNames := make([]string, len(toolCalls))
+				for i, tc := range toolCalls {
+					toolNames[i] = tc.Function.Name
+				}
+				details["tool_calls"] = toolNames
+			}
+			s.systemlog.Log(ctx, systemlog.InsertParams{
+				Category: systemlog.CategoryAI,
+				UserID:   &userID,
+				Details:  details,
+				Error:    errStr(err),
+			})
+		}
 		if err != nil {
 			if isInfrastructureError(err) {
 				return &Response{Message: "Something went wrong. Try again."}, nil
@@ -235,6 +283,19 @@ func (s *Service) Process(ctx context.Context, u *user.User, text string, audioB
 				}
 			} else {
 				result = "unknown tool"
+			}
+			if s.systemlog != nil {
+				success := !strings.HasPrefix(result, "error:")
+				errMsg := ""
+				if !success {
+					errMsg = strings.TrimPrefix(result, "error: ")
+				}
+				s.systemlog.Log(ctx, systemlog.InsertParams{
+					Category: systemlog.CategoryAI,
+					UserID:   &userID,
+					Details:  map[string]interface{}{"op": "ai_tool", "tool": tc.Function.Name, "success": success},
+					Error:    errMsg,
+				})
 			}
 			openaiMsgs = append(openaiMsgs, openai.ChatCompletionMessage{
 				Role:       openai.ChatMessageRoleTool,
@@ -368,6 +429,13 @@ func (s *Service) runExecuteCommands(ctx context.Context, userID uuid.UUID, wc *
 		}
 	}
 	return result, entries, prs, nil
+}
+
+func errStr(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 func isInfrastructureError(err error) bool {

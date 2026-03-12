@@ -69,7 +69,7 @@ func chatTestServer(t *testing.T, db *sql.DB, u *user.User, chatMessagesRepo *ch
 	userRepo := user.NewRepo(db)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
-	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(Chat(chatSvc))))
+	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud", nil)(http.HandlerFunc(Chat(chatSvc))))
 	return mux
 }
 
@@ -111,7 +111,7 @@ func chatTestServerWithR2(t *testing.T, db *sql.DB, u *user.User, chatMessagesRe
 	userRepo := user.NewRepo(db)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
-	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(Chat(chatSvc))))
+	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud", nil)(http.HandlerFunc(Chat(chatSvc))))
 	return mux
 }
 

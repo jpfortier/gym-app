@@ -40,7 +40,7 @@ func TestSessionsList_returnsUserSessions(t *testing.T) {
 
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
-	mux.Handle("GET /sessions", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(SessionsList(sessionRepo))))
+	mux.Handle("GET /sessions", auth.RequireAuth(verifier, userRepo, "aud", nil)(http.HandlerFunc(SessionsList(sessionRepo))))
 
 	req := httptest.NewRequest(http.MethodGet, "/sessions", nil)
 	req.Header.Set("Authorization", "Bearer x")
@@ -90,7 +90,7 @@ func TestSessionDetail_returnsSessionWithEntries(t *testing.T) {
 	exerciseRepo := exercise.NewRepo(db)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
-	mux.Handle("GET /sessions/{id}", auth.RequireAuth(verifier, user.NewRepo(db), "aud")(http.HandlerFunc(SessionDetail(sessionRepo, logentryRepo, exerciseRepo))))
+	mux.Handle("GET /sessions/{id}", auth.RequireAuth(verifier, user.NewRepo(db), "aud", nil)(http.HandlerFunc(SessionDetail(sessionRepo, logentryRepo, exerciseRepo))))
 
 	req := httptest.NewRequest(http.MethodGet, "/sessions/"+sess.ID.String(), nil)
 	req.Header.Set("Authorization", "Bearer x")
@@ -130,7 +130,7 @@ func TestSessionDetail_otherUserReturns404(t *testing.T) {
 
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u2.GoogleID}}
 	mux := http.NewServeMux()
-	mux.Handle("GET /sessions/{id}", auth.RequireAuth(verifier, user.NewRepo(db), "aud")(http.HandlerFunc(SessionDetail(sessionRepo, logentry.NewRepo(db), exercise.NewRepo(db)))))
+	mux.Handle("GET /sessions/{id}", auth.RequireAuth(verifier, user.NewRepo(db), "aud", nil)(http.HandlerFunc(SessionDetail(sessionRepo, logentry.NewRepo(db), exercise.NewRepo(db)))))
 
 	req := httptest.NewRequest(http.MethodGet, "/sessions/"+sess.ID.String(), nil)
 	req.Header.Set("Authorization", "Bearer x")
