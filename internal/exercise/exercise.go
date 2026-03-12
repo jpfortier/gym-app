@@ -16,10 +16,11 @@ type Category struct {
 }
 
 type Variant struct {
-	ID         uuid.UUID
-	CategoryID uuid.UUID
-	UserID     *uuid.UUID
-	Name       string
-	Standard   bool
-	CreatedAt  time.Time
+	ID          uuid.UUID
+	CategoryID  uuid.UUID
+	UserID      *uuid.UUID
+	Name        string
+	Standard    bool
+	VisualCues  string
+	CreatedAt   time.Time
 }

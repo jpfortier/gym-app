@@ -27,7 +27,7 @@ func (r *Repo) Resolve(ctx context.Context, userID uuid.UUID, categoryName, vari
 	if cat == nil {
 		return nil, nil
 	}
-	if variantName == "" {
+	if variantName == "" || variantName == "standard" {
 		return r.GetStandardVariantByCategory(ctx, cat.ID, userID)
 	}
 	return r.resolveVariant(ctx, cat.ID, userID, variantName)
@@ -71,12 +71,12 @@ func (r *Repo) getStandardVariant(ctx context.Context, categoryID uuid.UUID, use
 		userVal = *userID
 	}
 	var v Variant
-	var uid sql.NullString
+	var uid, visualCues sql.NullString
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, category_id, user_id, name, standard, created_at FROM exercise_variants
+		`SELECT id, category_id, user_id, name, standard, visual_cues, created_at FROM exercise_variants
 		 WHERE category_id = $1 AND (user_id IS NOT DISTINCT FROM $2) AND standard = true`,
 		categoryID, userVal,
-	).Scan(&v.ID, &v.CategoryID, &uid, &v.Name, &v.Standard, &v.CreatedAt)
+	).Scan(&v.ID, &v.CategoryID, &uid, &v.Name, &v.Standard, &visualCues, &v.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -84,5 +84,6 @@ func (r *Repo) getStandardVariant(ctx context.Context, categoryID uuid.UUID, use
 		return nil, err
 	}
 	v.UserID = db.NullStringToUUIDPtr(uid)
+	v.VisualCues = db.NullStringToString(visualCues)
 	return &v, nil
 }

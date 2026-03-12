@@ -54,6 +54,14 @@ func NullStringToUUIDPtr(n sql.NullString) *uuid.UUID {
 	return &u
 }
 
+// NullStringToString returns the string value, or "" if null.
+func NullStringToString(n sql.NullString) string {
+	if !n.Valid {
+		return ""
+	}
+	return n.String
+}
+
 // NullInt64ToIntPtr converts sql.NullInt64 to *int for scanning.
 func NullInt64ToIntPtr(n sql.NullInt64) *int {
 	if !n.Valid {

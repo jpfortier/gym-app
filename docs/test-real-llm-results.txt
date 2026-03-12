@@ -1,0 +1,78 @@
+# Real LLM Integration Test Results
+
+Run: make test-real-llm
+Date: 2025-03-11
+
+## Summary
+
+PASS - All 10 subtests passed in 57.74s
+
+## Send / Receive Table
+
+| Step | Input (sent) | Response (received) |
+|------|--------------|----------------------|
+| 1 | **Audio:** `20260306 133927.m4a`<br>Transcript: "Close Grip Bench Press, 130." | "How many reps are you pushing with that **130 lb** close grip bench press? Let's punch in the data and get you closer to being jacked." |
+| 2 | **Audio:** `20260306 133935.m4a`<br>Transcript: "What's my last close grip bench press?" | "Looks like you haven't punched your ticket on the close grip bench press yet. Let's get that first entry in—just drop those reps on me." |
+| 3 | **Audio:** `20260306 133944.m4a`<br>Transcript: "RDL 3 sets of 8 at 300 lbs and shoulder press 4 sets of 8 at 100 lbs." | "Looks like I hit a snag trying to log those exercises—seems like I need more details on the specific types. Could you let me know if it's a Romanian deadlift or something else for RDL, and specify the type of shoulder press you're doing? Let's keep those gains on track!" (prs=0) |
+| 4 | **Audio:** `20260306 134002.m4a`<br>Transcript: "What's my last deadlift?" | "You're all clear on the deadlift runway—haven't logged one yet. Let's get those numbers in and start chiseling that powerhouse base. If you're hitting **300 lbs** on the RDL, you're ready to knock this off your list. Let me know those reps, and we'll get it logged." |
+| 5 | **Text:** "squat 225 for 1" | "Alright, I need to know if it's a back squat, front squat, or something else to get it logged properly. Let me know, and we'll get that **225 lbs** squat noted down! Keep the pedal to the metal!" (prs=0) |
+| 6 | **Text:** "change the last squat to 230" | "Need a heads-up on the specific squat type to make that switch from **225 lbs** to **230 lbs**. Once you're set, let me know, and we'll lock it in. Stay sharp and make every rep count!" |
+| 7 | **Text:** "forget that squat" | "Looks like that squat entry didn't make it to the books. Nothing to worry about—let's gear up for a fresh session and smash those goals!" |
+| 8 | **Text:** "bring that squat back" | "Seems like there was nothing logged before, so there's nothing to restore. But that's no reason to slow down—let's keep pushing those boundaries and get big and jacked!" |
+| 9 | **Audio:** `20260309 142616.m4a`<br>Transcript: "My name's Rocky." | "Name's set, Rocky. It's time to put the pedal to the metal and step into the ring with your workouts!" |
+| 10 | **Text:** "note for bench press: narrow grip feels good" | "Note added for bench press: narrow grip feels good. Keep dialing in that form!" |
+
+## Images Created
+
+**None.** No PR images were generated because the LLM never successfully logged any exercises that would trigger a PR. It asked for clarification instead of executing:
+
+- Step 1: Asked for reps (didn't log close grip bench)
+- Step 3: Asked for RDL/shoulder press variants (didn't log)
+- Step 5: Asked for squat type (didn't log)
+
+DALL-E only runs when `execute_commands` returns PRs from a successful `CREATE_EXERCISE_ENTRY`. Since no logs completed, no PRs were created and no images were uploaded to R2.
+
+## Raw Output
+
+=== RUN   TestChat_realLLM_manual
+=== RUN   TestChat_realLLM_manual/1_audio_close_grip_bench
+    chat_integration_test.go:89: message="How many reps are you pushing with that **130 lb** close grip bench press? Let's punch in the data and get you closer to being jacked."
+=== RUN   TestChat_realLLM_manual/2_audio_query_close_grip
+    chat_integration_test.go:103: message="Looks like you haven't punched your ticket on the close grip bench press yet. Let's get that first entry in—just drop those reps on me."
+=== RUN   TestChat_realLLM_manual/3_audio_rdl_shoulder_pr
+    chat_integration_test.go:118: message="Looks like I hit a snag trying to log those exercises—seems like I need more details on the specific types. Could you let me know if it's a Romanian deadlift or something else for RDL, and specify the type of shoulder press you're doing? Let's keep those gains on track!" prs=0
+=== RUN   TestChat_realLLM_manual/4_audio_query_deadlift
+    chat_integration_test.go:132: message="You're all clear on the deadlift runway—haven't logged one yet. Let's get those numbers in and start chiseling that powerhouse base. If you're hitting **300 lbs** on the RDL, you're ready to knock this off your list. Let me know those reps, and we'll get it logged."
+=== RUN   TestChat_realLLM_manual/5_text_squat_1rm
+    chat_integration_test.go:146: message="Alright, I need to know if it's a back squat, front squat, or something else to get it logged properly. Let me know, and we'll get that **225 lbs** squat noted down! Keep the pedal to the metal!" prs=0
+=== RUN   TestChat_realLLM_manual/6_text_correction
+    chat_integration_test.go:159: message="Need a heads-up on the specific squat type to make that switch from **225 lbs** to **230 lbs**. Once you're set, let me know, and we'll lock it in. Stay sharp and make every rep count!"
+=== RUN   TestChat_realLLM_manual/7_text_remove
+    chat_integration_test.go:172: message="Looks like that squat entry didn't make it to the books. Nothing to worry about—let's gear up for a fresh session and smash those goals!"
+=== RUN   TestChat_realLLM_manual/8_text_restore
+    chat_integration_test.go:185: message="Seems like there was nothing logged before, so there's nothing to restore. But that's no reason to slow down—let's keep pushing those boundaries and get big and jacked!"
+=== RUN   TestChat_realLLM_manual/9_audio_set_name
+    chat_integration_test.go:199: message="Name's set, Rocky. It's time to put the pedal to the metal and step into the ring with your workouts!"
+=== RUN   TestChat_realLLM_manual/10_text_create_note
+    chat_integration_test.go:216: message="Note added for bench press: narrow grip feels good. Keep dialing in that form!"
+--- PASS: TestChat_realLLM_manual (57.12s)
+    --- PASS: TestChat_realLLM_manual/1_audio_close_grip_bench (5.75s)
+    --- PASS: TestChat_realLLM_manual/2_audio_query_close_grip (6.83s)
+    --- PASS: TestChat_realLLM_manual/3_audio_rdl_shoulder_pr (9.51s)
+    --- PASS: TestChat_realLLM_manual/4_audio_query_deadlift (9.28s)
+    --- PASS: TestChat_realLLM_manual/5_text_squat_1rm (6.70s)
+    --- PASS: TestChat_realLLM_manual/6_text_correction (2.09s)
+    --- PASS: TestChat_realLLM_manual/7_text_remove (4.41s)
+    --- PASS: TestChat_realLLM_manual/8_text_restore (2.04s)
+    --- PASS: TestChat_realLLM_manual/9_audio_set_name (5.51s)
+    --- PASS: TestChat_realLLM_manual/10_text_create_note (3.82s)
+PASS
+ok  	github.com/jpfortier/gym-app/internal/handler	57.743s
+
+## Notes
+
+- Steps 1–2: LLM asked for reps instead of inferring from "100" or "130" in context
+- Step 3: RDL+shoulder press — LLM asked for clarification on variants instead of logging
+- Step 5: Squat — LLM asked for type (back/front) instead of defaulting to standard
+- Step 9: Set name worked correctly
+- Step 10: Create note worked correctly

@@ -32,6 +32,7 @@ CREATE TABLE exercise_variants (
     user_id uuid REFERENCES users(id) ON DELETE CASCADE,
     name text NOT NULL,
     standard boolean NOT NULL DEFAULT false,
+    visual_cues text,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     embedding vector(1536),
@@ -111,15 +112,17 @@ CREATE TABLE ai_usage (
 );
 CREATE INDEX idx_ai_usage_user_created ON ai_usage(user_id, created_at);
 
-CREATE TABLE user_exercise_aliases (
+-- exercise_aliases: user_id NULL = global alias, user_id set = user alias
+CREATE TABLE exercise_aliases (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id uuid REFERENCES users(id) ON DELETE CASCADE,
     alias_key text NOT NULL,
     variant_id uuid NOT NULL REFERENCES exercise_variants(id) ON DELETE CASCADE,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    UNIQUE (user_id, alias_key)
+    created_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_user_exercise_aliases_user_alias ON user_exercise_aliases (user_id, alias_key);
+CREATE UNIQUE INDEX idx_exercise_aliases_global ON exercise_aliases (alias_key) WHERE user_id IS NULL;
+CREATE UNIQUE INDEX idx_exercise_aliases_user ON exercise_aliases (user_id, alias_key) WHERE user_id IS NOT NULL;
+CREATE INDEX idx_exercise_aliases_lookup ON exercise_aliases (alias_key);
 
 CREATE TABLE chat_messages (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
