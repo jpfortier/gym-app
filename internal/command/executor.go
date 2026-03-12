@@ -441,7 +441,11 @@ func (e *Executor) resolveEntryID(ctx context.Context, userID uuid.UUID, targetR
 		refs.lastEntryID = entries[0].ID.String()
 		return entries[0].ID.String(), nil
 	}
-	if _, err := uuid.Parse(targetRef); err == nil {
+	if parsed, err := uuid.Parse(targetRef); err == nil {
+		entryID, err := e.logentryRepo.GetEntryIDBySetID(ctx, parsed)
+		if err == nil && entryID != uuid.Nil {
+			return entryID.String(), nil
+		}
 		return targetRef, nil
 	}
 	return "", fmt.Errorf("target_ref %q could not be resolved", targetRef)
