@@ -14,7 +14,6 @@ import (
 	"github.com/jpfortier/gym-app/internal/chat"
 	"github.com/jpfortier/gym-app/internal/chatmessages"
 	"github.com/jpfortier/gym-app/internal/command"
-	"github.com/jpfortier/gym-app/internal/correction"
 	"github.com/jpfortier/gym-app/internal/db"
 	"github.com/jpfortier/gym-app/internal/env"
 	"github.com/jpfortier/gym-app/internal/exercise"
@@ -80,7 +79,6 @@ func NewServer(ctx context.Context) (*Server, error) {
 	sessionSvc := session.NewService(sessionRepo)
 	logentrySvc := logentry.NewService(logentryRepo, sessionSvc)
 	queryService := query.NewService(exerciseRepo, logentryRepo, sessionRepo)
-	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
 	prSvc := pr.NewService(prRepo)
 	notesRepo := notes.NewRepo(database)
 	usageRepo := usage.NewRepo(database)
@@ -101,19 +99,11 @@ func NewServer(ctx context.Context) (*Server, error) {
 	syslog := systemlog.NewRepoLogger(syslogRepo)
 	chatSvc := chat.NewService(chat.Config{
 		Client:           aiClient,
-		UserRepo:         userRepo,
-		NameHandler:      name.NewHandler(aiClient),
-		SessionSvc:       sessionSvc,
 		SessionRepo:      sessionRepo,
-		LogentrySvc:      logentrySvc,
 		LogentryRepo:     logentryRepo,
-		ExerciseSvc:      exerciseSvc,
 		ExerciseRepo:     exerciseRepo,
 		QuerySvc:         queryService,
-		CorrectionSvc:    correctionSvc,
-		PrSvc:            prSvc,
 		PrRepo:           prRepo,
-		NotesRepo:        notesRepo,
 		ChatMessagesRepo: chatMessagesRepo,
 		R2:               r2,
 		CommandExecutor:  cmdExecutor,

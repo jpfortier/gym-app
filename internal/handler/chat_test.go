@@ -19,7 +19,6 @@ import (
 	"github.com/jpfortier/gym-app/internal/chat"
 	"github.com/jpfortier/gym-app/internal/chatmessages"
 	"github.com/jpfortier/gym-app/internal/command"
-	"github.com/jpfortier/gym-app/internal/correction"
 	"github.com/jpfortier/gym-app/internal/exercise"
 	"github.com/jpfortier/gym-app/internal/logentry"
 	"github.com/jpfortier/gym-app/internal/name"
@@ -45,7 +44,6 @@ func chatTestService(t *testing.T, db *sql.DB, chatMessagesRepo *chatmessages.Re
 	sessionSvc := session.NewService(sessionRepo)
 	logentrySvc := logentry.NewService(logentryRepo, sessionSvc)
 	querySvc := query.NewService(exerciseRepo, logentryRepo, sessionRepo)
-	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
 	prSvc := pr.NewService(prRepo)
 	notesRepo := notes.NewRepo(db)
 	cmdExecutor := command.NewExecutor(
@@ -53,12 +51,16 @@ func chatTestService(t *testing.T, db *sql.DB, chatMessagesRepo *chatmessages.Re
 		user.NewRepo(db), name.NewHandler(aiClient), notesRepo, prSvc,
 	)
 	return chat.NewService(chat.Config{
-		Client: aiClient, UserRepo: user.NewRepo(db), NameHandler: name.NewHandler(aiClient),
-		SessionSvc: sessionSvc, SessionRepo: sessionRepo,
-		LogentrySvc: logentrySvc, LogentryRepo: logentryRepo,
-		ExerciseSvc: exerciseSvc, ExerciseRepo: exerciseRepo, QuerySvc: querySvc, CorrectionSvc: correctionSvc,
-		PrSvc: prSvc, PrRepo: prRepo, NotesRepo: notesRepo, ChatMessagesRepo: chatMessagesRepo, R2: nil,
-		CommandExecutor: cmdExecutor,
+		Client:           aiClient,
+		SessionRepo:      sessionRepo,
+		LogentryRepo:     logentryRepo,
+		ExerciseRepo:     exerciseRepo,
+		QuerySvc:         querySvc,
+		PrRepo:           prRepo,
+		ChatMessagesRepo: chatMessagesRepo,
+		R2:               nil,
+		CommandExecutor:  cmdExecutor,
+		Systemlog:        nil,
 	})
 }
 
@@ -86,7 +88,6 @@ func chatTestServiceWithR2(t *testing.T, db *sql.DB, chatMessagesRepo *chatmessa
 	sessionSvc := session.NewService(sessionRepo)
 	logentrySvc := logentry.NewService(logentryRepo, sessionSvc)
 	querySvc := query.NewService(exerciseRepo, logentryRepo, sessionRepo)
-	correctionSvc := correction.NewService(logentryRepo, exerciseRepo)
 	prSvc := pr.NewService(prRepo)
 	notesRepo := notes.NewRepo(db)
 	cmdExecutor := command.NewExecutor(
@@ -95,12 +96,16 @@ func chatTestServiceWithR2(t *testing.T, db *sql.DB, chatMessagesRepo *chatmessa
 	)
 	r2, _ := storage.NewR2()
 	return chat.NewService(chat.Config{
-		Client: aiClient, UserRepo: user.NewRepo(db), NameHandler: name.NewHandler(aiClient),
-		SessionSvc: sessionSvc, SessionRepo: sessionRepo,
-		LogentrySvc: logentrySvc, LogentryRepo: logentryRepo,
-		ExerciseSvc: exerciseSvc, ExerciseRepo: exerciseRepo, QuerySvc: querySvc, CorrectionSvc: correctionSvc,
-		PrSvc: prSvc, PrRepo: prRepo, NotesRepo: notesRepo, ChatMessagesRepo: chatMessagesRepo, R2: r2,
-		CommandExecutor: cmdExecutor,
+		Client:           aiClient,
+		SessionRepo:      sessionRepo,
+		LogentryRepo:     logentryRepo,
+		ExerciseRepo:     exerciseRepo,
+		QuerySvc:         querySvc,
+		PrRepo:           prRepo,
+		ChatMessagesRepo: chatMessagesRepo,
+		R2:               r2,
+		CommandExecutor:  cmdExecutor,
+		Systemlog:        nil,
 	})
 }
 

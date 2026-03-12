@@ -14,11 +14,8 @@ import (
 	"github.com/jpfortier/gym-app/internal/ai"
 	"github.com/jpfortier/gym-app/internal/chatmessages"
 	"github.com/jpfortier/gym-app/internal/command"
-	"github.com/jpfortier/gym-app/internal/correction"
 	"github.com/jpfortier/gym-app/internal/exercise"
 	"github.com/jpfortier/gym-app/internal/logentry"
-	"github.com/jpfortier/gym-app/internal/name"
-	"github.com/jpfortier/gym-app/internal/notes"
 	"github.com/jpfortier/gym-app/internal/pr"
 	"github.com/jpfortier/gym-app/internal/query"
 	"github.com/jpfortier/gym-app/internal/session"
@@ -60,41 +57,25 @@ type PRResult struct {
 
 // Config holds dependencies for the chat service.
 type Config struct {
-	Client            *ai.Client
-	UserRepo          *user.Repo
-	NameHandler       *name.Handler
-	SessionSvc        *session.Service
-	SessionRepo       *session.Repo
-	LogentrySvc       *logentry.Service
-	LogentryRepo      *logentry.Repo
-	ExerciseSvc       *exercise.Service
-	ExerciseRepo      *exercise.Repo
-	QuerySvc          *query.Service
-	CorrectionSvc     *correction.Service
-	PrSvc             *pr.Service
-	PrRepo            *pr.Repo
-	NotesRepo         *notes.Repo
-	ChatMessagesRepo  *chatmessages.Repo
-	R2                *storage.R2
-	CommandExecutor   *command.Executor
-	Systemlog         systemlog.Logger
+	Client           *ai.Client
+	SessionRepo      *session.Repo
+	LogentryRepo     *logentry.Repo
+	ExerciseRepo     *exercise.Repo
+	QuerySvc         *query.Service
+	PrRepo           *pr.Repo
+	ChatMessagesRepo *chatmessages.Repo
+	R2               *storage.R2
+	CommandExecutor  *command.Executor
+	Systemlog        systemlog.Logger
 }
 
 type Service struct {
 	client            *ai.Client
-	userRepo          *user.Repo
-	nameHandler       *name.Handler
-	sessionSvc        *session.Service
-	logentrySvc       *logentry.Service
 	logentryRepo      *logentry.Repo
-	sessionRepo       *session.Repo
-	exerciseSvc       *exercise.Service
 	exerciseRepo      *exercise.Repo
+	sessionRepo       *session.Repo
 	querySvc          *query.Service
-	correctionSvc     *correction.Service
-	prSvc             *pr.Service
 	prRepo            *pr.Repo
-	notesRepo         *notes.Repo
 	chatMessagesRepo  *chatmessages.Repo
 	r2                *storage.R2
 	workoutCtxBuilder  *workoutcontext.Builder
@@ -109,22 +90,14 @@ func NewService(cfg Config) *Service {
 	}
 	return &Service{
 		client:            cfg.Client,
-		userRepo:          cfg.UserRepo,
-		nameHandler:       cfg.NameHandler,
-		sessionSvc:        cfg.SessionSvc,
-		logentrySvc:       cfg.LogentrySvc,
 		logentryRepo:      cfg.LogentryRepo,
-		sessionRepo:       cfg.SessionRepo,
-		exerciseSvc:       cfg.ExerciseSvc,
 		exerciseRepo:      cfg.ExerciseRepo,
+		sessionRepo:       cfg.SessionRepo,
 		querySvc:          cfg.QuerySvc,
-		correctionSvc:     cfg.CorrectionSvc,
-		prSvc:             cfg.PrSvc,
 		prRepo:            cfg.PrRepo,
-		notesRepo:         cfg.NotesRepo,
 		chatMessagesRepo:  cfg.ChatMessagesRepo,
 		r2:                cfg.R2,
-		workoutCtxBuilder: wcBuilder,
+		workoutCtxBuilder:  wcBuilder,
 		commandExecutor:   cfg.CommandExecutor,
 		systemlog:         cfg.Systemlog,
 	}
