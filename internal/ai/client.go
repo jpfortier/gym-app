@@ -61,6 +61,7 @@ func (c *Client) Transcribe(ctx context.Context, userID uuid.UUID, audioBase64 s
 		Model:    openai.Whisper1,
 		FilePath: "audio." + fileExt,
 		Reader:   bytes.NewReader(data),
+		Format:   openai.AudioResponseFormatVerboseJSON,
 	}
 	resp, err := c.client.CreateTranscription(ctx, req)
 	if err != nil {
@@ -144,12 +145,6 @@ func (c *Client) chatWithToolsMock(messages []ChatMessage, tools []openai.Tool) 
 		}
 		if strings.HasPrefix(lastToolContent, "success: ") {
 			return strings.TrimPrefix(lastToolContent, "success: "), nil, nil
-		}
-		if strings.Contains(lastToolContent, "Scratched") {
-			return "Scratched.", nil, nil
-		}
-		if strings.Contains(lastToolContent, "Back in") {
-			return "Back in.", nil, nil
 		}
 		return "Logged bench press **135×8** for today.", nil, nil
 	}

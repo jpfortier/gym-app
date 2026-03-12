@@ -198,7 +198,15 @@ func (s *Service) Process(ctx context.Context, u *user.User, text string, audioB
 
 		for _, tc := range toolCalls {
 			var result string
-			if tc.Function.Name == "query_history" {
+			if tc.Function.Name == "reply_from_context" {
+				var args struct {
+					Message string `json:"message"`
+				}
+				if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err == nil && args.Message != "" {
+					finalMessage = args.Message
+				}
+				result = "ok"
+			} else if tc.Function.Name == "query_history" {
 				hist, r, err := s.runQueryHistory(ctx, userID, tc.Function.Arguments)
 				if err != nil {
 					result = "error: " + err.Error()
@@ -218,6 +226,7 @@ func (s *Service) Process(ctx context.Context, u *user.User, text string, audioB
 						result = string(prJSON) + "\n\nFormat a celebratory message for these PRs."
 					} else if args := parseExecuteArgs(tc.Function.Arguments); args != nil && args.SuccessMessage != "" {
 						result = "success: " + args.SuccessMessage
+						finalMessage = args.SuccessMessage
 					} else {
 						result = "success"
 					}
@@ -232,6 +241,9 @@ func (s *Service) Process(ctx context.Context, u *user.User, text string, audioB
 				Content:    result,
 				ToolCallID: tc.ID,
 			})
+		}
+		if finalMessage != "" {
+			break
 		}
 	}
 
@@ -314,6 +326,7 @@ func (s *Service) runQueryHistory(ctx context.Context, userID uuid.UUID, argsJSO
 }
 
 func (s *Service) runExecuteCommands(ctx context.Context, userID uuid.UUID, wc *workoutcontext.WorkoutContext, argsJSON string) (*command.ExecutionResult, []LogResult, []PRResult, error) {
+	slog.Debug("execute_commands", "args", argsJSON)
 	var args executeArgs
 	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
 		return nil, nil, nil, err
@@ -350,7 +363,7 @@ func (s *Service) runExecuteCommands(ctx context.Context, userID uuid.UUID, wc *
 			prs = append(prs, PRResult{ID: p.ID, Exercise: p.Exercise, Variant: p.Variant, Weight: p.Weight, Reps: p.Reps, PRType: p.PRType})
 			if s.r2 != nil {
 				prRec := &pr.PersonalRecord{ID: uuid.MustParse(p.ID), UserID: userID, Weight: p.Weight, Reps: p.Reps, PRType: p.PRType}
-				s.generateAndUploadPRImage(ctx, userID, prRec, p.Exercise)
+				s.generateAndUploadPRImage(ctx, userID, prRec, p.Exercise, p.Variant)
 			}
 		}
 	}
@@ -406,11 +419,24 @@ func (s *Service) appendMessages(ctx context.Context, userID uuid.UUID, userText
 	_ = s.chatMessagesRepo.Append(ctx, userID, "assistant", assistantMessage)
 }
 
-func (s *Service) generateAndUploadPRImage(ctx context.Context, userID uuid.UUID, p *pr.PersonalRecord, exerciseName string) {
+func (s *Service) generateAndUploadPRImage(ctx context.Context, userID uuid.UUID, p *pr.PersonalRecord, categoryName, variantName string) {
 	if s.r2 == nil {
 		return
 	}
-	img, err := s.client.GeneratePRImage(ctx, userID, exerciseName, p.Weight, p.Reps, p.PRType)
+	exerciseName := variantName
+	visualCues := ""
+	if s.exerciseRepo != nil {
+		variant, err := s.exerciseRepo.Resolve(ctx, userID, categoryName, variantName)
+		if err == nil && variant != nil {
+			exerciseName = variant.Name
+			visualCues = variant.VisualCues
+		} else if variantName == "" {
+			exerciseName = categoryName
+		}
+	} else if variantName == "" {
+		exerciseName = categoryName
+	}
+	img, err := s.client.GeneratePRImage(ctx, userID, exerciseName, p.Weight, p.Reps, p.PRType, visualCues)
 	if err != nil {
 		slog.Warn("pr image generation failed", "pr_id", p.ID, "err", err)
 		return

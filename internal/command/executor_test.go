@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/jpfortier/gym-app/internal/ai"
@@ -28,12 +27,7 @@ func TestExecutor_EnsureSession(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	u := &user.User{GoogleID: "cmd-es-" + uuid.New().String(), Email: "ces-" + uuid.New().String() + "@test.com", Name: "CES"}
-	userRepo := user.NewRepo(db)
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "cmd-es")
 
 	sessionRepo := session.NewRepo(db)
 	sessionSvc := session.NewService(sessionRepo)
@@ -57,12 +51,7 @@ func TestExecutor_CreateExerciseEntry(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	u := &user.User{GoogleID: "cmd-ce-" + uuid.New().String(), Email: "cce-" + uuid.New().String() + "@test.com", Name: "CCE"}
-	userRepo := user.NewRepo(db)
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "cmd-ce")
 
 	exerciseRepo := exercise.NewRepo(db)
 	exerciseSvc := exercise.NewService(exerciseRepo, nil)
@@ -104,12 +93,7 @@ func TestExecutor_AppendSet(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	u := &user.User{GoogleID: "cmd-as-" + uuid.New().String(), Email: "cas-" + uuid.New().String() + "@test.com", Name: "CAS"}
-	userRepo := user.NewRepo(db)
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "cmd-as")
 
 	exerciseRepo := exercise.NewRepo(db)
 	exerciseSvc := exercise.NewService(exerciseRepo, nil)
@@ -163,6 +147,9 @@ func TestExecutor_AppendSet(t *testing.T) {
 	if len(updated.Sets) >= 2 && (updated.Sets[1].Weight == nil || *updated.Sets[1].Weight != 205) {
 		t.Errorf("expected second set 205x3, got %v", updated.Sets[1])
 	}
+	if len(result.PRs) == 0 {
+		t.Error("expected PR when appending heavier set (205x3 beats 185x5)")
+	}
 }
 
 func TestExecutor_UpdateSet(t *testing.T) {
@@ -170,12 +157,7 @@ func TestExecutor_UpdateSet(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	u := &user.User{GoogleID: "cmd-us-" + uuid.New().String(), Email: "cus-" + uuid.New().String() + "@test.com", Name: "CUS"}
-	userRepo := user.NewRepo(db)
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "cmd-us")
 
 	exerciseRepo := exercise.NewRepo(db)
 	variant, err := exerciseRepo.Resolve(ctx, u.ID, "squat", "standard")
@@ -225,12 +207,7 @@ func TestExecutor_DeleteSet(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	u := &user.User{GoogleID: "cmd-ds-" + uuid.New().String(), Email: "cds-" + uuid.New().String() + "@test.com", Name: "CDS"}
-	userRepo := user.NewRepo(db)
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "cmd-ds")
 
 	exerciseRepo := exercise.NewRepo(db)
 	variant, err := exerciseRepo.Resolve(ctx, u.ID, "bench press", "standard")
@@ -278,12 +255,8 @@ func TestExecutor_RestoreEntry(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	u := &user.User{GoogleID: "cmd-re-" + uuid.New().String(), Email: "cre-" + uuid.New().String() + "@test.com", Name: "CRE"}
+	u := testutil.CreateTestUser(t, db, ctx, "cmd-re")
 	userRepo := user.NewRepo(db)
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	exerciseRepo := exercise.NewRepo(db)
 	variant, err := exerciseRepo.Resolve(ctx, u.ID, "deadlift", "standard")
@@ -329,12 +302,8 @@ func TestExecutor_UpdateName(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	u := &user.User{GoogleID: "cmd-un-" + uuid.New().String(), Email: "cun-" + uuid.New().String() + "@test.com", Name: ""}
+	u := testutil.CreateTestUser(t, db, ctx, "cmd-un")
 	userRepo := user.NewRepo(db)
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	exec := NewExecutor(nil, nil, nil, nil, nil, userRepo, nil, nil, nil)
 	result := exec.Execute(ctx, u.ID, []Command{
@@ -357,12 +326,8 @@ func TestExecutor_SetName(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	u := &user.User{GoogleID: "cmd-sn-" + uuid.New().String(), Email: "csn-" + uuid.New().String() + "@test.com", Name: ""}
+	u := testutil.CreateTestUser(t, db, ctx, "cmd-sn")
 	userRepo := user.NewRepo(db)
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	throttle := ai.NewThrottler(60, 1000, 10)
 	aiClient := ai.NewClient(throttle, nil)
@@ -385,12 +350,7 @@ func TestExecutor_CreateNote(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	u := &user.User{GoogleID: "cmd-cn-" + uuid.New().String(), Email: "ccn-" + uuid.New().String() + "@test.com", Name: "CCN"}
-	userRepo := user.NewRepo(db)
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "cmd-cn")
 
 	exerciseRepo := exercise.NewRepo(db)
 	exerciseSvc := exercise.NewService(exerciseRepo, nil)

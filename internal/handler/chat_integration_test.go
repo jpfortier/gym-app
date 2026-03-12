@@ -3,8 +3,10 @@ package handler
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -19,6 +21,7 @@ import (
 	"github.com/jpfortier/gym-app/internal/env"
 	"github.com/jpfortier/gym-app/internal/exercise"
 	"github.com/jpfortier/gym-app/internal/logentry"
+	"github.com/jpfortier/gym-app/internal/pr"
 	"github.com/jpfortier/gym-app/internal/session"
 	"github.com/jpfortier/gym-app/internal/user"
 )
@@ -100,6 +103,130 @@ func TestChat_realLLM_manual(t *testing.T) {
 			t.Errorf("correction: expected message, got %v", out["message"])
 		}
 		t.Logf("correction message=%q", msg)
+	})
+
+	// 0a. Text: two logs same exercise, second better — expect PR (first = baseline no celebration, second = celebrate).
+	// Executor unit test TestExecutor_AppendSet verifies PR detection; this exercises the full LLM path.
+	t.Run("0a_text_two_logs_same_exercise_pr", func(t *testing.T) {
+		code, out := postChat("", "deadlift 185 for 5")
+		if code != http.StatusOK {
+			t.Fatalf("first log: got status %d: %v", code, out)
+		}
+		entries, _ := out["entries"].([]interface{})
+		if len(entries) == 0 {
+			t.Fatalf("first log: expected entries, got %d", len(entries))
+		}
+		prs1, _ := out["prs"].([]interface{})
+		if len(prs1) != 0 {
+			t.Logf("first log: expected 0 PRs (baseline), got %d", len(prs1))
+		}
+
+		code, out = postChat("", "deadlift 200 for 5")
+		if code != http.StatusOK {
+			t.Fatalf("second log: got status %d: %v", code, out)
+		}
+		prs2, _ := out["prs"].([]interface{})
+		if len(prs2) < 1 {
+			t.Logf("second log (better): expected >=1 PR, got %d — LLM may batch/append differently. message=%q", len(prs2), out["message"])
+		} else {
+			t.Logf("second log: prs=%d ✓", len(prs2))
+		}
+
+		// Debug: dump DB state for this user to trace PR flow
+		rows, err := db.QueryContext(ctx, `
+			SELECT ev.name as variant, ec.name as category, le.raw_speech, les.weight, les.reps, les.set_order
+			FROM log_entries le
+			JOIN log_entry_sets les ON les.log_entry_id = le.id
+			JOIN exercise_variants ev ON ev.id = le.exercise_variant_id
+			JOIN exercise_categories ec ON ec.id = ev.category_id
+			JOIN workout_sessions ws ON ws.id = le.session_id
+			WHERE ws.user_id = $1 AND le.disabled_at IS NULL
+			ORDER BY le.created_at, les.set_order`,
+			u.ID)
+		if err == nil {
+			t.Logf("--- DB log_entries+sets for user %s ---", u.ID)
+			for rows.Next() {
+				var variant, category, raw string
+				var weight sql.NullFloat64
+				var reps, setOrder int
+				_ = rows.Scan(&variant, &category, &raw, &weight, &reps, &setOrder)
+				w := "nil"
+				if weight.Valid {
+					w = fmt.Sprintf("%.0f", weight.Float64)
+				}
+				t.Logf("  %s %s: %s set_order=%d weight=%s reps=%d", category, variant, raw, setOrder, w, reps)
+			}
+			rows.Close()
+		}
+		var prCount int
+		_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM personal_records WHERE user_id = $1`, u.ID).Scan(&prCount)
+		t.Logf("--- personal_records count: %d ---", prCount)
+		prRows, err2 := db.QueryContext(ctx, `
+			SELECT ec.name, ev.name, pr.pr_type, pr.weight, pr.reps
+			FROM personal_records pr
+			JOIN exercise_variants ev ON ev.id = pr.exercise_variant_id
+			JOIN exercise_categories ec ON ec.id = ev.category_id
+			WHERE pr.user_id = $1 ORDER BY pr.created_at`, u.ID)
+		if err2 == nil {
+			for prRows.Next() {
+				var cat, v, prType string
+				var w float64
+				var r sql.NullInt64
+				_ = prRows.Scan(&cat, &v, &prType, &w, &r)
+				repsStr := "nil"
+				if r.Valid {
+					repsStr = fmt.Sprintf("%d", r.Int64)
+				}
+				t.Logf("  PR: %s %s %s %.0fx%s", cat, v, prType, w, repsStr)
+			}
+			prRows.Close()
+		}
+	})
+
+	// 0b. Text: two rack pulls — second is PR, triggers gpt-image-1.5 Edit API with reference images.
+	// Requires GYM_PR_IMAGE_REF_1, GYM_PR_IMAGE_REF_2 and R2 configured for image_url to be set.
+	t.Run("0b_text_pr_image_generation", func(t *testing.T) {
+		code, out := postChat("", "rack pull 200 for 5")
+		if code != http.StatusOK {
+			t.Fatalf("first log: got status %d: %v", code, out)
+		}
+		entries, _ := out["entries"].([]interface{})
+		if len(entries) == 0 {
+			t.Fatalf("first log: expected entries, got %d. message=%q", len(entries), out["message"])
+		}
+
+		code, out = postChat("", "rack pull 370 for 5")
+		if code != http.StatusOK {
+			t.Fatalf("second log: got status %d: %v", code, out)
+		}
+		prs, _ := out["prs"].([]interface{})
+		if len(prs) < 1 {
+			t.Fatalf("second log: expected >=1 PR, got %d. message=%q", len(prs), out["message"])
+		}
+		t.Logf("prs=%d ✓", len(prs))
+
+		refIDs := env.PRImageRefFileIDs()
+		if len(refIDs) > 0 {
+			prRepo := pr.NewRepo(db)
+			list, err := prRepo.ListByUser(ctx, u.ID)
+			if err != nil {
+				t.Fatalf("list PRs: %v", err)
+			}
+			var foundWithImage int
+			for _, p := range list {
+				if p.ImageURL != "" {
+					foundWithImage++
+					t.Logf("PR %s has image_url=%s", p.ID, p.ImageURL)
+				}
+			}
+			if foundWithImage == 0 {
+				t.Logf("no PRs with image_url yet (R2 may be unconfigured or image gen failed)")
+			} else {
+				t.Logf("PR image generation: %d PR(s) with image_url ✓", foundWithImage)
+			}
+		} else {
+			t.Logf("GYM_PR_IMAGE_REF_1/2 not set, skipping image_url check")
+		}
 	})
 
 	// 1. Audio: Close Grip Bench Press, 130.

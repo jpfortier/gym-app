@@ -1,0 +1,153 @@
+{
+  "categories": [
+    {
+      "category": "deadlift",
+      "exercises": [
+        {"name":"conventional deadlift","aliases":["deadlift","barbell deadlift","standard deadlift"],"visual_cues":"barbell on floor near shins\nlifter hip hinge\nbar pulled to standing"},
+        {"name":"sumo deadlift","aliases":["sumo dl","wide stance deadlift"],"visual_cues":"very wide stance\nhands inside knees\nbarbell pulled from floor"},
+        {"name":"romanian deadlift","aliases":["rdl","romanian dl"],"visual_cues":"bar starts at hips\nslides down thighs\nhip hinge movement"},
+        {"name":"stiff leg deadlift","aliases":["sldl","straight leg deadlift"],"visual_cues":"legs mostly straight\nbar lowered toward floor"},
+        {"name":"rack pull","aliases":["pin deadlift","partial deadlift","rack deadlift"],"visual_cues":"bar on rack pins\npower rack visible\nshort deadlift range"},
+        {"name":"deficit deadlift","aliases":["deficit dl"],"visual_cues":"lifter standing on plate\nbar below feet\nlonger range deadlift"},
+        {"name":"trap bar deadlift","aliases":["hex bar deadlift","trap bar dl"],"visual_cues":"hexagonal trap bar around lifter\nhands at sides"},
+        {"name":"snatch grip deadlift","aliases":["wide grip deadlift"],"visual_cues":"very wide grip\nbarbell pulled from floor"},
+        {"name":"single leg deadlift","aliases":["single leg rdl","one leg deadlift"],"visual_cues":"one leg on floor\nhinge forward with weight"},
+        {"name":"dumbbell deadlift","aliases":["db deadlift"],"visual_cues":"dumbbells at sides\nhip hinge to standing"}
+      ]
+    },
+
+    {
+      "category": "squat",
+      "exercises": [
+        {"name":"back squat","aliases":["barbell squat","high bar squat"],"visual_cues":"barbell on upper back\nlifter descending into squat"},
+        {"name":"low bar squat","aliases":["powerlifting squat"],"visual_cues":"bar lower on back\nforward torso squat"},
+        {"name":"front squat","aliases":["olympic front squat"],"visual_cues":"bar on front shoulders\nelbows high"},
+        {"name":"goblet squat","aliases":["db goblet squat","kb goblet squat"],"visual_cues":"dumbbell at chest\ndeep squat"},
+        {"name":"zercher squat","aliases":["zercher"],"visual_cues":"barbell in elbows\nheld in front while squatting"},
+        {"name":"overhead squat","aliases":["ohs"],"visual_cues":"barbell locked overhead\ndeep squat stance"},
+        {"name":"box squat","aliases":["pause box squat"],"visual_cues":"squat down to box behind lifter"},
+        {"name":"hack squat","aliases":["machine hack squat"],"visual_cues":"angled hack squat machine\nshoulders under pads"},
+        {"name":"belt squat","aliases":["hip belt squat"],"visual_cues":"weight attached to belt\nsquat without bar"},
+        {"name":"split squat","aliases":["static lunge"],"visual_cues":"one foot forward one back\nlower into squat"}
+      ]
+    },
+
+    {
+      "category": "bench press",
+      "exercises": [
+        {"name":"bench press","aliases":["barbell bench press","flat bench"],"visual_cues":"lying on bench\nbarbell pressed from chest"},
+        {"name":"close grip bench press","aliases":["cgbp","narrow bench"],"visual_cues":"hands close on bar\npress from chest"},
+        {"name":"wide grip bench press","aliases":["wide bench"],"visual_cues":"very wide hand placement"},
+        {"name":"incline bench press","aliases":["incline barbell press"],"visual_cues":"incline bench\npress upward"},
+        {"name":"decline bench press","aliases":["decline barbell press"],"visual_cues":"decline bench angle"},
+        {"name":"floor press","aliases":["barbell floor press"],"visual_cues":"lying on floor\nbarbell lowered until elbows hit floor"},
+        {"name":"board press","aliases":["powerlifting board press"],"visual_cues":"wood board on chest\npartial press"},
+        {"name":"spoto press","aliases":["pause bench press"],"visual_cues":"bar paused just above chest"},
+        {"name":"reverse grip bench press","aliases":["supinated bench"],"visual_cues":"underhand grip bench press"},
+        {"name":"guillotine press","aliases":["neck press"],"visual_cues":"bar lowered toward neck"}
+      ]
+    },
+
+    {
+      "category": "overhead press",
+      "exercises": [
+        {"name":"overhead press","aliases":["ohp","military press","barbell shoulder press"],"visual_cues":"barbell pressed overhead from shoulders"},
+        {"name":"push press","aliases":["barbell push press"],"visual_cues":"knee dip then explosive press"},
+        {"name":"strict press","aliases":["strict ohp"],"visual_cues":"standing press no leg drive"},
+        {"name":"seated barbell press","aliases":["seated shoulder press"],"visual_cues":"seated lifter pressing overhead"},
+        {"name":"dumbbell shoulder press","aliases":["db press"],"visual_cues":"two dumbbells pressed overhead"},
+        {"name":"arnold press","aliases":["arnold dumbbell press"],"visual_cues":"rotating dumbbells while pressing"},
+        {"name":"behind neck press","aliases":["bn press"],"visual_cues":"barbell lowered behind head"},
+        {"name":"log press","aliases":["strongman log press"],"visual_cues":"large log implement pressed overhead"}
+      ]
+    },
+
+    {
+      "category": "row",
+      "exercises": [
+        {"name":"barbell row","aliases":["bent over row"],"visual_cues":"torso bent forward\nbar pulled to stomach"},
+        {"name":"pendlay row","aliases":["pendlay barbell row"],"visual_cues":"bar pulled explosively from floor"},
+        {"name":"dumbbell row","aliases":["one arm row"],"visual_cues":"one knee on bench\nrow dumbbell"},
+        {"name":"seal row","aliases":["bench supported row"],"visual_cues":"lying face down on bench\nrow barbell"},
+        {"name":"t bar row","aliases":["landmine row"],"visual_cues":"t bar handle row toward chest"},
+        {"name":"inverted row","aliases":["bodyweight row","australian pull up"],"visual_cues":"body under bar\npull chest to bar"},
+        {"name":"cable row","aliases":["seated cable row"],"visual_cues":"seated row cable handle"},
+        {"name":"meadows row","aliases":["landmine single arm row"],"visual_cues":"one arm landmine row"}
+      ]
+    },
+
+    {
+      "category": "pull up",
+      "exercises": [
+        {"name":"pull up","aliases":["bodyweight pull up"],"visual_cues":"wide grip\nchin above bar"},
+        {"name":"chin up","aliases":["underhand pull up"],"visual_cues":"underhand grip\nbody pulled upward"},
+        {"name":"neutral grip pull up","aliases":["parallel pull up"],"visual_cues":"neutral handles pull up"},
+        {"name":"weighted pull up","aliases":["belt pull up"],"visual_cues":"weight plate hanging from belt"},
+        {"name":"kipping pull up","aliases":["crossfit pull up"],"visual_cues":"body swinging upward"}
+      ]
+    },
+
+    {
+      "category": "dip",
+      "exercises": [
+        {"name":"parallel bar dip","aliases":["bodyweight dip"],"visual_cues":"body between dip bars\npress upward"},
+        {"name":"bench dip","aliases":["triceps bench dip"],"visual_cues":"hands on bench behind body"},
+        {"name":"weighted dip","aliases":["belt dip"],"visual_cues":"weight plate hanging from belt"}
+      ]
+    },
+
+    {
+      "category": "biceps curl",
+      "exercises": [
+        {"name":"barbell curl","aliases":["biceps curl"],"visual_cues":"barbell curled upward"},
+        {"name":"dumbbell curl","aliases":["alternating curl"],"visual_cues":"curl dumbbells toward shoulders"},
+        {"name":"hammer curl","aliases":["neutral grip curl"],"visual_cues":"dumbbells vertical during curl"},
+        {"name":"preacher curl","aliases":["bench curl"],"visual_cues":"arms on preacher bench"},
+        {"name":"spider curl","aliases":["incline bench curl"],"visual_cues":"lying chest down on bench curling"},
+        {"name":"concentration curl","aliases":["single arm curl"],"visual_cues":"elbow braced on thigh"},
+        {"name":"reverse curl","aliases":["pronated curl"],"visual_cues":"overhand barbell curl"},
+        {"name":"zottman curl","aliases":["rotation curl"],"visual_cues":"curl then rotate wrist downward"}
+      ]
+    },
+
+    {
+      "category": "triceps extension",
+      "exercises": [
+        {"name":"skull crusher","aliases":["lying triceps extension","ez bar skull crusher"],"visual_cues":"lying on bench\nbar lowered toward forehead"},
+        {"name":"overhead triceps extension","aliases":["db overhead extension"],"visual_cues":"dumbbell overhead\nelbows bent"},
+        {"name":"cable pushdown","aliases":["triceps pushdown"],"visual_cues":"cable bar pushed downward"},
+        {"name":"rope pushdown","aliases":["rope triceps extension"],"visual_cues":"rope attachment pushed downward"},
+        {"name":"kickback","aliases":["dumbbell kickback"],"visual_cues":"arm extended backward with dumbbell"}
+      ]
+    },
+
+    {
+      "category": "lunge",
+      "exercises": [
+        {"name":"barbell lunge","aliases":["walking lunge"],"visual_cues":"step forward\nrear knee toward floor"},
+        {"name":"dumbbell lunge","aliases":["db walking lunge"],"visual_cues":"dumbbells at sides\nstepping lunges"},
+        {"name":"reverse lunge","aliases":["backward lunge"],"visual_cues":"step backward into lunge"},
+        {"name":"bulgarian split squat","aliases":["rear foot elevated squat"],"visual_cues":"rear foot on bench"},
+        {"name":"curtsy lunge","aliases":["cross back lunge"],"visual_cues":"leg crosses behind body"}
+      ]
+    },
+
+    {
+      "category": "calf raise",
+      "exercises": [
+        {"name":"standing calf raise","aliases":["machine calf raise"],"visual_cues":"standing on toes under pads"},
+        {"name":"seated calf raise","aliases":["seated machine calf raise"],"visual_cues":"seated with pads on knees"},
+        {"name":"single leg calf raise","aliases":["one leg calf raise"],"visual_cues":"one foot raising onto toes"}
+      ]
+    },
+
+    {
+      "category": "hip thrust",
+      "exercises": [
+        {"name":"barbell hip thrust","aliases":["glute thrust"],"visual_cues":"shoulders on bench\nbarbell across hips"},
+        {"name":"glute bridge","aliases":["barbell glute bridge"],"visual_cues":"lying on floor\nbarbell across hips"},
+        {"name":"single leg hip thrust","aliases":["one leg hip thrust"],"visual_cues":"one leg raised\nhips driving upward"}
+      ]
+    }
+  ]
+}

@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"google.golang.org/api/idtoken"
 
+	"github.com/google/uuid"
 	"github.com/jpfortier/gym-app/internal/ai"
 	"github.com/jpfortier/gym-app/internal/auth"
 	"github.com/jpfortier/gym-app/internal/chat"
@@ -28,6 +28,7 @@ import (
 	"github.com/jpfortier/gym-app/internal/query"
 	"github.com/jpfortier/gym-app/internal/session"
 	"github.com/jpfortier/gym-app/internal/storage"
+	"github.com/jpfortier/gym-app/internal/testutil"
 	"github.com/jpfortier/gym-app/internal/user"
 )
 
@@ -119,12 +120,7 @@ func TestChat_logIntent(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "chat-" + uuid.New().String(), Email: "c-" + uuid.New().String() + "@test.com", Name: "C"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "chat")
 
 	mux := chatTestServer(t, db, u, nil)
 
@@ -152,14 +148,7 @@ func TestChat_removeIntent(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "chat-rm-" + uuid.New().String(), Email: "rm-" + uuid.New().String() + "@test.com", Name: "RM"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM log_entries WHERE session_id IN (SELECT id FROM workout_sessions WHERE user_id = $1)", u.ID) })
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM workout_sessions WHERE user_id = $1", u.ID) })
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "chat-rm")
 
 	mux := chatTestServer(t, db, u, nil)
 
@@ -173,6 +162,12 @@ func TestChat_removeIntent(t *testing.T) {
 		t.Fatalf("log: got status %d: %s", rec.Code, rec.Body.String())
 	}
 
+	// Get bench entry for today (assert on DB state, not message text)
+	benchEntryID, benchDisabledAt := getBenchEntryForToday(t, db, ctx, u.ID)
+	if benchEntryID == "" {
+		t.Fatal("expected bench entry after log, none found")
+	}
+
 	body, _ = json.Marshal(map[string]string{"text": "forget that bench"})
 	req = httptest.NewRequest(http.MethodPost, "/chat", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer x")
@@ -183,12 +178,9 @@ func TestChat_removeIntent(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Errorf("remove: got status %d: %s", rec.Code, rec.Body.String())
 	}
-	var out map[string]interface{}
-	if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
-		t.Fatal(err)
-	}
-	if msg, _ := out["message"].(string); msg != "Scratched." {
-		t.Errorf("got message %v, want Scratched.", out["message"])
+	_, benchDisabledAt = getBenchEntryForToday(t, db, ctx, u.ID)
+	if benchDisabledAt == nil {
+		t.Error("remove: expected bench entry to be disabled (disabled_at set)")
 	}
 
 	body, _ = json.Marshal(map[string]string{"text": "oh sorry bring that bench back"})
@@ -201,12 +193,37 @@ func TestChat_removeIntent(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Errorf("restore: got status %d: %s", rec.Code, rec.Body.String())
 	}
-	if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
-		t.Fatal(err)
+	_, benchDisabledAt = getBenchEntryForToday(t, db, ctx, u.ID)
+	if benchDisabledAt != nil {
+		t.Error("restore: expected bench entry to be re-enabled (disabled_at null)")
 	}
-	if msg, _ := out["message"].(string); msg != "Back in." {
-		t.Errorf("got message %v, want Back in.", out["message"])
+}
+
+func getBenchEntryForToday(t *testing.T, db *sql.DB, ctx context.Context, userID uuid.UUID) (entryID string, disabledAt *time.Time) {
+	t.Helper()
+	today := time.Now().Format("2006-01-02")
+	var id string
+	var disAt sql.NullTime
+	err := db.QueryRowContext(ctx,
+		`SELECT le.id, le.disabled_at FROM log_entries le
+		 JOIN workout_sessions ws ON le.session_id = ws.id
+		 JOIN exercise_variants ev ON le.exercise_variant_id = ev.id
+		 JOIN exercise_categories ec ON ev.category_id = ec.id
+		 WHERE ws.user_id = $1 AND ws.date = $2::date
+		 AND LOWER(ec.name) = 'bench press'
+		 ORDER BY le.created_at DESC LIMIT 1`,
+		userID, today,
+	).Scan(&id, &disAt)
+	if err == sql.ErrNoRows {
+		return "", nil
 	}
+	if err != nil {
+		t.Fatalf("getBenchEntryForToday: %v", err)
+	}
+	if disAt.Valid {
+		return id, &disAt.Time
+	}
+	return id, nil
 }
 
 func TestChat_contextStoresMessages(t *testing.T) {
@@ -214,16 +231,8 @@ func TestChat_contextStoresMessages(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	userRepo := user.NewRepo(db)
 	chatMessagesRepo := chatmessages.NewRepo(db)
-	u := &user.User{GoogleID: "chat-ctx-" + uuid.New().String(), Email: "ctx-" + uuid.New().String() + "@test.com", Name: "Ctx"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM chat_messages WHERE user_id = $1", u.ID) })
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM log_entries WHERE session_id IN (SELECT id FROM workout_sessions WHERE user_id = $1)", u.ID) })
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM workout_sessions WHERE user_id = $1", u.ID) })
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "chat-ctx")
 
 	mux := chatTestServer(t, db, u, chatMessagesRepo)
 
@@ -251,12 +260,7 @@ func TestChat_correctionWithSquat(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "chat-corr-" + uuid.New().String(), Email: "corr-" + uuid.New().String() + "@test.com", Name: "C"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "chat-corr")
 
 	sessionRepo := session.NewRepo(db)
 	logentryRepo := logentry.NewRepo(db)
@@ -301,13 +305,7 @@ func TestChat_setName(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "name-" + uuid.New().String(), Email: "name-" + uuid.New().String() + "@test.com", Name: ""}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM chat_messages WHERE user_id = $1", u.ID) })
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "name")
 
 	mux := chatTestServer(t, db, u, nil)
 
@@ -337,6 +335,7 @@ func TestChat_setName(t *testing.T) {
 		t.Errorf("message should mention name: %q", msg)
 	}
 	// Verify user name was updated
+	userRepo := user.NewRepo(db)
 	got, _ := userRepo.GetByGoogleID(ctx, u.GoogleID)
 	if got == nil || got.Name == "" {
 		t.Error("expected user name to be set")
@@ -362,18 +361,7 @@ func TestChat_logAndQuerySamplesFromAudio(t *testing.T) {
 			defer db.Close()
 			ctx := context.Background()
 
-			userRepo := user.NewRepo(db)
-			u := &user.User{GoogleID: "samples-" + uuid.New().String(), Email: "samples-" + uuid.New().String() + "@test.com", Name: "S"}
-			if err := userRepo.Create(ctx, u); err != nil {
-				t.Fatal(err)
-			}
-			t.Cleanup(func() {
-				_, _ = db.ExecContext(ctx, "DELETE FROM log_entry_sets WHERE log_entry_id IN (SELECT id FROM log_entries WHERE session_id IN (SELECT id FROM workout_sessions WHERE user_id = $1))", u.ID)
-				_, _ = db.ExecContext(ctx, "DELETE FROM log_entries WHERE session_id IN (SELECT id FROM workout_sessions WHERE user_id = $1)", u.ID)
-				_, _ = db.ExecContext(ctx, "DELETE FROM workout_sessions WHERE user_id = $1", u.ID)
-				_, _ = db.ExecContext(ctx, "DELETE FROM chat_messages WHERE user_id = $1", u.ID)
-				_, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID)
-			})
+			u := testutil.CreateTestUser(t, db, ctx, "samples")
 
 			mux := chatTestServer(t, db, u, nil)
 

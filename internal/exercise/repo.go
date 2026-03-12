@@ -72,20 +72,20 @@ func (r *Repo) GetCategoryByUserAndName(ctx context.Context, userID *uuid.UUID, 
 func (r *Repo) CreateVariant(ctx context.Context, v *Variant) error {
 	db.EnsureV7(&v.ID)
 	return r.db.QueryRowContext(ctx,
-		`INSERT INTO exercise_variants (id, category_id, user_id, name, standard)
-		 VALUES ($1, $2, $3, $4, $5)
+		`INSERT INTO exercise_variants (id, category_id, user_id, name, standard, visual_cues)
+		 VALUES ($1, $2, $3, $4, $5, $6)
 		 RETURNING created_at`,
-		v.ID, v.CategoryID, db.NullUUID(v.UserID), v.Name, v.Standard,
+		v.ID, v.CategoryID, db.NullUUID(v.UserID), v.Name, v.Standard, db.NullStr(v.VisualCues),
 	).Scan(&v.CreatedAt)
 }
 
 func (r *Repo) GetVariantByID(ctx context.Context, id uuid.UUID) (*Variant, error) {
 	var v Variant
-	var userID sql.NullString
+	var userID, visualCues sql.NullString
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, category_id, user_id, name, standard, created_at FROM exercise_variants WHERE id = $1`,
+		`SELECT id, category_id, user_id, name, standard, visual_cues, created_at FROM exercise_variants WHERE id = $1`,
 		id,
-	).Scan(&v.ID, &v.CategoryID, &userID, &v.Name, &v.Standard, &v.CreatedAt)
+	).Scan(&v.ID, &v.CategoryID, &userID, &v.Name, &v.Standard, &visualCues, &v.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -93,6 +93,7 @@ func (r *Repo) GetVariantByID(ctx context.Context, id uuid.UUID) (*Variant, erro
 		return nil, err
 	}
 	v.UserID = db.NullStringToUUIDPtr(userID)
+	v.VisualCues = db.NullStringToString(visualCues)
 	return &v, nil
 }
 
@@ -103,12 +104,12 @@ func (r *Repo) GetVariantByCategoryAndName(ctx context.Context, categoryID uuid.
 		userVal = *userID
 	}
 	var v Variant
-	var uid sql.NullString
+	var uid, visualCues sql.NullString
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, category_id, user_id, name, standard, created_at FROM exercise_variants
+		`SELECT id, category_id, user_id, name, standard, visual_cues, created_at FROM exercise_variants
 		 WHERE category_id = $1 AND (user_id IS NOT DISTINCT FROM $2) AND LOWER(name) = $3`,
 		categoryID, userVal, name,
-	).Scan(&v.ID, &v.CategoryID, &uid, &v.Name, &v.Standard, &v.CreatedAt)
+	).Scan(&v.ID, &v.CategoryID, &uid, &v.Name, &v.Standard, &visualCues, &v.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -116,12 +117,13 @@ func (r *Repo) GetVariantByCategoryAndName(ctx context.Context, categoryID uuid.
 		return nil, err
 	}
 	v.UserID = db.NullStringToUUIDPtr(uid)
+	v.VisualCues = db.NullStringToString(visualCues)
 	return &v, nil
 }
 
 func (r *Repo) ListVariantsByCategory(ctx context.Context, categoryID uuid.UUID, userID uuid.UUID) ([]*Variant, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, category_id, user_id, name, standard, created_at FROM exercise_variants
+		`SELECT id, category_id, user_id, name, standard, visual_cues, created_at FROM exercise_variants
 		 WHERE category_id = $1 AND (user_id IS NULL OR user_id = $2) ORDER BY name`,
 		categoryID, userID,
 	)
@@ -132,11 +134,12 @@ func (r *Repo) ListVariantsByCategory(ctx context.Context, categoryID uuid.UUID,
 	var out []*Variant
 	for rows.Next() {
 		var v Variant
-		var uid sql.NullString
-		if err := rows.Scan(&v.ID, &v.CategoryID, &uid, &v.Name, &v.Standard, &v.CreatedAt); err != nil {
+		var uid, visualCues sql.NullString
+		if err := rows.Scan(&v.ID, &v.CategoryID, &uid, &v.Name, &v.Standard, &visualCues, &v.CreatedAt); err != nil {
 			return nil, err
 		}
 		v.UserID = db.NullStringToUUIDPtr(uid)
+		v.VisualCues = db.NullStringToString(visualCues)
 		out = append(out, &v)
 	}
 	return out, rows.Err()
@@ -186,15 +189,15 @@ func (r *Repo) FindVariantByEmbedding(ctx context.Context, categoryID uuid.UUID,
 	}
 	vec := pgvector.NewVector(emb)
 	var v Variant
-	var uid sql.NullString
+	var uid, visualCues sql.NullString
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, category_id, user_id, name, standard, created_at
+		`SELECT id, category_id, user_id, name, standard, visual_cues, created_at
 		 FROM exercise_variants
 		 WHERE category_id = $1 AND (user_id IS NULL OR user_id = $2) AND embedding IS NOT NULL
 		   AND (embedding <=> $3) < $4
 		 ORDER BY embedding <=> $3 LIMIT 1`,
 		categoryID, userID, vec, maxDistance,
-	).Scan(&v.ID, &v.CategoryID, &uid, &v.Name, &v.Standard, &v.CreatedAt)
+	).Scan(&v.ID, &v.CategoryID, &uid, &v.Name, &v.Standard, &visualCues, &v.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -202,6 +205,7 @@ func (r *Repo) FindVariantByEmbedding(ctx context.Context, categoryID uuid.UUID,
 		return nil, err
 	}
 	v.UserID = db.NullStringToUUIDPtr(uid)
+	v.VisualCues = db.NullStringToString(visualCues)
 	return &v, nil
 }
 
@@ -234,8 +238,10 @@ func (r *Repo) FindVariantByAlias(ctx context.Context, userID uuid.UUID, aliasKe
 	}
 	var variantID uuid.UUID
 	err := r.db.QueryRowContext(ctx,
-		`SELECT variant_id FROM user_exercise_aliases WHERE user_id = $1 AND alias_key = $2`,
-		userID, aliasKey,
+		`SELECT variant_id FROM exercise_aliases
+		 WHERE alias_key = $1 AND (user_id IS NULL OR user_id = $2)
+		 ORDER BY user_id NULLS FIRST LIMIT 1`,
+		aliasKey, userID,
 	).Scan(&variantID)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -252,9 +258,9 @@ func (r *Repo) StoreAlias(ctx context.Context, userID uuid.UUID, aliasKey string
 		return nil
 	}
 	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO user_exercise_aliases (user_id, alias_key, variant_id)
+		`INSERT INTO exercise_aliases (user_id, alias_key, variant_id)
 		 VALUES ($1, $2, $3)
-		 ON CONFLICT (user_id, alias_key) DO NOTHING`,
+		 ON CONFLICT DO NOTHING`,
 		userID, aliasKey, variantID,
 	)
 	return err
@@ -268,11 +274,11 @@ type UserAlias struct {
 
 func (r *Repo) ListUserAliases(ctx context.Context, userID uuid.UUID) ([]UserAlias, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT uea.alias_key, ec.name || ' ' || ev.name
-		 FROM user_exercise_aliases uea
-		 JOIN exercise_variants ev ON ev.id = uea.variant_id
+		`SELECT ea.alias_key, ec.name || ' ' || ev.name
+		 FROM exercise_aliases ea
+		 JOIN exercise_variants ev ON ev.id = ea.variant_id
 		 JOIN exercise_categories ec ON ec.id = ev.category_id
-		 WHERE uea.user_id = $1`,
+		 WHERE ea.user_id = $1`,
 		userID,
 	)
 	if err != nil {

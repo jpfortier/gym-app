@@ -9,6 +9,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/jpfortier/gym-app/internal/session"
+	"github.com/jpfortier/gym-app/internal/testutil"
 	"github.com/jpfortier/gym-app/internal/user"
 )
 
@@ -18,7 +19,6 @@ func TestService_CreateLogEntry(t *testing.T) {
 	ctx := context.Background()
 
 	u := createLogEntryTestUser(t, db, ctx)
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) }()
 
 	var variantID uuid.UUID
 	if err := db.QueryRowContext(ctx, `SELECT id FROM exercise_variants WHERE user_id IS NULL LIMIT 1`).Scan(&variantID); err != nil {
@@ -59,7 +59,6 @@ func TestService_CreateLogEntry_sameDayReusesSession(t *testing.T) {
 	ctx := context.Background()
 
 	u := createLogEntryTestUser(t, db, ctx)
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) }()
 
 	var variantID uuid.UUID
 	if err := db.QueryRowContext(ctx, `SELECT id FROM exercise_variants WHERE user_id IS NULL LIMIT 1`).Scan(&variantID); err != nil {
@@ -91,7 +90,6 @@ func TestService_CreateLogEntry_sessionAndLogEntryIntegration(t *testing.T) {
 	ctx := context.Background()
 
 	u := createLogEntryTestUser(t, db, ctx)
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) }()
 
 	var variantID uuid.UUID
 	if err := db.QueryRowContext(ctx, `SELECT id FROM exercise_variants WHERE user_id IS NULL LIMIT 1`).Scan(&variantID); err != nil {
@@ -120,11 +118,5 @@ func TestService_CreateLogEntry_sessionAndLogEntryIntegration(t *testing.T) {
 }
 
 func createLogEntryTestUser(t *testing.T, db *sql.DB, ctx context.Context) *user.User {
-	t.Helper()
-	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "logsvc-" + uuid.New().String(), Email: "logsvc-" + uuid.New().String() + "@test.com", Name: "Log Svc"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	return u
+	return testutil.CreateTestUser(t, db, ctx, "logsvc")
 }

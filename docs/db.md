@@ -52,16 +52,16 @@ To be seeded in migration. Examples: Bench Press, Deadlift, Squat, Overhead Pres
 - Or: separate `exercise_embeddings` table (entity_id, entity_type, embedding)
 - Generate via OpenAI embeddings API when creating/updating exercises
 
-### user_exercise_aliases
-Learned mappings from user input to resolved variant. When we resolve via embedding or create a new variant, we store the alias so future lookups skip the LLM.
+### exercise_aliases
+Mappings from alias_key to resolved variant. `user_id` NULL = global alias (e.g. "deadlift rdl" → romanian deadlift); `user_id` set = user-specific override.
 - `id` uuid PK
-- `user_id` uuid FK → users (ON DELETE CASCADE)
-- `alias_key` text — normalized input, e.g. `"rdl standard"`
+- `user_id` uuid FK → users (ON DELETE CASCADE), nullable for global
+- `alias_key` text — normalized input, e.g. `"deadlift rdl"`
 - `variant_id` uuid FK → exercise_variants (ON DELETE CASCADE)
 - `created_at` timestamptz
-- Unique: (user_id, alias_key)
+- Unique: (alias_key) WHERE user_id IS NULL; (user_id, alias_key) WHERE user_id IS NOT NULL
 
-**Resolution order:** Exact match → alias lookup → embedding match → create new. Store alias when resolving via embedding or create.
+**Resolution order:** Exact match → alias lookup (global first, then user) → embedding match → create new. Store alias when resolving via embedding or create.
 
 ### workout_sessions
 One per user per day (or explicit session).
@@ -236,7 +236,7 @@ Token tracking for admin dashboard.
 
 ## Indexes (To Add)
 
-- `user_exercise_aliases(user_id, alias_key)` — for alias lookup (created in migration 000009)
+- `exercise_aliases(alias_key)` — for alias lookup; global (user_id NULL) and user-scoped (migration 000014)
 - `log_entries(session_id)`
 - `log_entries(exercise_variant_id, created_at)` — for history queries
 - `log_entry_sets(log_entry_id)`

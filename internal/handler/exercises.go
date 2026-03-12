@@ -30,14 +30,18 @@ func ExercisesList(exerciseRepo *exercise.Repo) http.HandlerFunc {
 				return
 			}
 			for _, v := range variants {
-				out = append(out, map[string]any{
-					"category_id":    c.ID.String(),
-					"category_name":  c.Name,
-					"variant_id":     v.ID.String(),
-					"variant_name":   v.Name,
-					"show_weight":    c.ShowWeight,
-					"show_reps":      c.ShowReps,
-				})
+				m := map[string]any{
+					"category_id":   c.ID.String(),
+					"category_name": c.Name,
+					"variant_id":    v.ID.String(),
+					"variant_name":  v.Name,
+					"show_weight":   c.ShowWeight,
+					"show_reps":     c.ShowReps,
+				}
+				if v.VisualCues != "" {
+					m["visual_cues"] = v.VisualCues
+				}
+				out = append(out, m)
 			}
 		}
 

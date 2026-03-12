@@ -8,11 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/jpfortier/gym-app/internal/env"
-	"github.com/jpfortier/gym-app/internal/user"
+	"github.com/jpfortier/gym-app/internal/testutil"
 )
 
 // TestChat_audioSamples runs sample audio files through the full pipeline (Whisper + Parse + Log).
@@ -30,15 +29,7 @@ func TestChat_audioSamples(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "audio-" + uuid.New().String(), Email: "audio-" + uuid.New().String() + "@test.com", Name: "Audio"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM log_entry_sets WHERE log_entry_id IN (SELECT id FROM log_entries WHERE session_id IN (SELECT id FROM workout_sessions WHERE user_id = $1))", u.ID) })
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM log_entries WHERE session_id IN (SELECT id FROM workout_sessions WHERE user_id = $1)", u.ID) })
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM workout_sessions WHERE user_id = $1", u.ID) })
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
+	u := testutil.CreateTestUser(t, db, ctx, "audio")
 
 	chatSvc := chatTestService(t, db, nil)
 

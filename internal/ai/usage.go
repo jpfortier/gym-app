@@ -22,6 +22,8 @@ func CostCents(model string, promptTokens, completionTokens int) float64 {
 		return float64(total) * 0.00002
 	case "dall-e-3":
 		return 4.0
+	case "gpt-image-1.5":
+		return 4.0
 	default:
 		return 0
 	}

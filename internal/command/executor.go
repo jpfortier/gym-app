@@ -223,6 +223,28 @@ func (e *Executor) doAppendSet(ctx context.Context, userID uuid.UUID, cmd *Comma
 	result.CreatedSetIDs = append(result.CreatedSetIDs, setID.String())
 	refs.lastCreatedSetID = setID.String()
 	refs.lastEntryID = entryID
+
+	full, _ := e.logentryRepo.GetByID(ctx, eid)
+	if full != nil {
+		prs, _ := e.prSvc.CheckAndCreatePRs(ctx, userID, full)
+		v, _ := e.exerciseRepo.GetVariantByID(ctx, full.ExerciseVariantID)
+		catName := ""
+		if v != nil {
+			if cat, _ := e.exerciseRepo.GetCategoryByID(ctx, v.CategoryID); cat != nil {
+				catName = cat.Name
+			}
+			for _, p := range prs {
+				result.PRs = append(result.PRs, PRInfo{
+					ID:       p.ID.String(),
+					Exercise: catName,
+					Variant:  v.Name,
+					Weight:   p.Weight,
+					Reps:     p.Reps,
+					PRType:   p.PRType,
+				})
+			}
+		}
+	}
 	return nil
 }
 

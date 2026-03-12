@@ -31,7 +31,8 @@ type Embedder interface {
 	Embed(ctx context.Context, userID uuid.UUID, text string) ([]float32, error)
 }
 
-// Service provides ResolveOrCreate: exact match → alias lookup → embedding match → create new.
+// Service provides ResolveOrCreate: exact match → alias lookup → create new.
+// We always create when not found; no semantic matching to avoid wrong mappings (e.g. "rack pull" → "bench press").
 type Service struct {
 	repo     *Repo
 	embedder Embedder
@@ -57,6 +58,9 @@ func (s *Service) ResolveOrCreate(ctx context.Context, userID uuid.UUID, categor
 		return v, nil
 	}
 	aliasKey := categoryName + " " + variantName
+	if variantName == "" {
+		aliasKey = categoryName + " standard"
+	}
 	v, err = s.repo.FindVariantByAlias(ctx, userID, aliasKey)
 	if err != nil {
 		return nil, err
@@ -64,17 +68,23 @@ func (s *Service) ResolveOrCreate(ctx context.Context, userID uuid.UUID, categor
 	if v != nil {
 		return v, nil
 	}
-	if s.embedder != nil {
-		v, err = s.resolveByEmbedding(ctx, userID, categoryName, variantName)
+
+	cat, err := s.repo.GetCategoryByUserAndName(ctx, nil, categoryName)
+	if err != nil {
+		return nil, err
+	}
+	if cat == nil {
+		cat, err = s.repo.GetCategoryByUserAndName(ctx, &userID, categoryName)
 		if err != nil {
 			return nil, err
 		}
-		if v != nil {
-			_ = s.repo.StoreAlias(ctx, userID, aliasKey, v.ID)
-			return v, nil
-		}
 	}
-	v, err = s.createCategoryAndVariant(ctx, userID, categoryName, variantName)
+
+	if cat != nil {
+		v, err = s.createVariantForCategory(ctx, userID, cat.ID, categoryName, variantName, false)
+	} else {
+		v, err = s.createCategoryAndVariant(ctx, userID, categoryName, variantName)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -82,18 +92,25 @@ func (s *Service) ResolveOrCreate(ctx context.Context, userID uuid.UUID, categor
 	return v, nil
 }
 
-func (s *Service) resolveByEmbedding(ctx context.Context, userID uuid.UUID, categoryName, variantName string) (*Variant, error) {
-	emb, err := s.embedder.Embed(ctx, userID, categoryName+" "+variantName)
-	if err != nil || len(emb) == 0 {
-		return nil, nil
+func (s *Service) createVariantForCategory(ctx context.Context, userID uuid.UUID, categoryID uuid.UUID, categoryName, variantName string, isStandard bool) (*Variant, error) {
+	name := variantName
+	if name == "" {
+		name = "standard"
 	}
-	cat, err := s.repo.FindCategoryByEmbedding(ctx, userID, emb, 0.2)
-	if err != nil || cat == nil {
-		return nil, err
+	v := &Variant{
+		CategoryID: categoryID,
+		UserID:     &userID,
+		Name:       name,
+		Standard:   isStandard,
 	}
-	v, err := s.repo.FindVariantByEmbedding(ctx, cat.ID, userID, emb, 0.2)
-	if err != nil || v == nil {
-		return nil, err
+	if err := s.repo.CreateVariant(ctx, v); err != nil {
+		return nil, fmt.Errorf("create variant: %w", err)
+	}
+	if s.embedder != nil {
+		emb, err := s.embedder.Embed(ctx, userID, categoryName+" "+name)
+		if err == nil && len(emb) > 0 {
+			_ = s.repo.UpdateVariantEmbedding(ctx, v.ID, emb)
+		}
 	}
 	return v, nil
 }
@@ -108,29 +125,5 @@ func (s *Service) createCategoryAndVariant(ctx context.Context, userID uuid.UUID
 	if err := s.repo.CreateCategory(ctx, cat); err != nil {
 		return nil, fmt.Errorf("create category: %w", err)
 	}
-	name := variantName
-	if name == "" {
-		name = "standard"
-	}
-	v := &Variant{
-		CategoryID: cat.ID,
-		UserID:     &userID,
-		Name:       name,
-		Standard:   true, // first variant for new category is the default
-	}
-	if err := s.repo.CreateVariant(ctx, v); err != nil {
-		return nil, fmt.Errorf("create variant: %w", err)
-	}
-	if s.embedder != nil {
-		emb, err := s.embedder.Embed(ctx, userID, categoryName+" "+variantName)
-		if err == nil && len(emb) > 0 {
-			if err := s.repo.UpdateCategoryEmbedding(ctx, cat.ID, emb); err != nil {
-				return nil, fmt.Errorf("update category embedding: %w", err)
-			}
-			if err := s.repo.UpdateVariantEmbedding(ctx, v.ID, emb); err != nil {
-				return nil, fmt.Errorf("update variant embedding: %w", err)
-			}
-		}
-	}
-	return v, nil
+	return s.createVariantForCategory(ctx, userID, cat.ID, categoryName, variantName, true)
 }

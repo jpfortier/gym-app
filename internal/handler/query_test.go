@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"google.golang.org/api/idtoken"
 
 	"github.com/jpfortier/gym-app/internal/auth"
@@ -16,6 +15,7 @@ import (
 	"github.com/jpfortier/gym-app/internal/logentry"
 	"github.com/jpfortier/gym-app/internal/query"
 	"github.com/jpfortier/gym-app/internal/session"
+	"github.com/jpfortier/gym-app/internal/testutil"
 	"github.com/jpfortier/gym-app/internal/user"
 )
 
@@ -24,12 +24,8 @@ func TestQueryHistory_returnsEntries(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
+	u := testutil.CreateTestUser(t, db, ctx, "query")
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "query-" + uuid.New().String(), Email: "q-" + uuid.New().String() + "@test.com", Name: "Q"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	exerciseRepo := exercise.NewRepo(db)
 	variant, err := exerciseRepo.Resolve(ctx, u.ID, "bench press", "standard")
@@ -79,12 +75,8 @@ func TestQueryHistory_missingCategoryReturns400(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
+	u := testutil.CreateTestUser(t, db, ctx, "query-400")
 	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "query-400-" + uuid.New().String(), Email: "q4-" + uuid.New().String() + "@test.com", Name: "Q4"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) })
 
 	exerciseRepo := exercise.NewRepo(db)
 	logentryRepo := logentry.NewRepo(db)

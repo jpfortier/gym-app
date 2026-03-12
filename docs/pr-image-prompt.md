@@ -1,6 +1,9 @@
-# PR Image Prompt (DALL-E)
+# PR Image Prompt (gpt-image-1.5 Edit API)
 
-Reference: `samples/trains/` — three example styles.
+Reference: `samples/trains/` — character sheet + context examples.
+
+Uses Images Edit API (`POST /v1/images/edits`) with reference images uploaded via Files API.
+File IDs in `GYM_PR_IMAGE_REF_1`, `GYM_PR_IMAGE_REF_2`.
 
 ## Style (from samples)
 

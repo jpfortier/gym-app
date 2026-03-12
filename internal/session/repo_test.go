@@ -10,7 +10,6 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/jpfortier/gym-app/internal/testutil"
-	"github.com/jpfortier/gym-app/internal/user"
 )
 
 func dbForTest(t *testing.T) *sql.DB { return testutil.DBForTest(t) }
@@ -20,12 +19,7 @@ func TestRepo_Create_GetByID(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "session-test-" + uuid.New().String(), Email: "session-" + uuid.New().String() + "@test.com", Name: "Session Test"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) }()
+	u := testutil.CreateTestUser(t, db, ctx, "session-test")
 
 	repo := NewRepo(db)
 	s := &Session{UserID: u.ID, Date: time.Date(2025, 3, 7, 0, 0, 0, 0, time.UTC)}
@@ -71,12 +65,7 @@ func TestRepo_GetByUserAndDate(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "session-by-date-" + uuid.New().String(), Email: "by-date-" + uuid.New().String() + "@test.com", Name: "By Date"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) }()
+	u := testutil.CreateTestUser(t, db, ctx, "session-by-date")
 
 	repo := NewRepo(db)
 	s := &Session{UserID: u.ID, Date: time.Date(2025, 3, 8, 0, 0, 0, 0, time.UTC)}
@@ -101,12 +90,7 @@ func TestRepo_GetByUserAndDate_notFound(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "session-nf-" + uuid.New().String(), Email: "nf-" + uuid.New().String() + "@test.com", Name: "NF"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) }()
+	u := testutil.CreateTestUser(t, db, ctx, "session-nf")
 
 	repo := NewRepo(db)
 	got, err := repo.GetByUserAndDate(ctx, u.ID, "2025-01-01")
@@ -123,12 +107,7 @@ func TestRepo_ListByUser(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "session-list-" + uuid.New().String(), Email: "list-" + uuid.New().String() + "@test.com", Name: "List"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID) }()
+	u := testutil.CreateTestUser(t, db, ctx, "session-list")
 
 	repo := NewRepo(db)
 	for i, d := range []string{"2025-03-05", "2025-03-06", "2025-03-07"} {

@@ -5,14 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/jpfortier/gym-app/internal/exercise"
 	"github.com/jpfortier/gym-app/internal/logentry"
 	"github.com/jpfortier/gym-app/internal/session"
 	"github.com/jpfortier/gym-app/internal/testutil"
-	"github.com/jpfortier/gym-app/internal/user"
 )
 
 func TestCheckAndCreatePRs_firstEntryNoCelebration(t *testing.T) {
@@ -20,18 +18,7 @@ func TestCheckAndCreatePRs_firstEntryNoCelebration(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "pr-first-" + uuid.New().String(), Email: "prf-" + uuid.New().String() + "@test.com", Name: "PR"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		db.ExecContext(ctx, "DELETE FROM personal_records WHERE user_id = $1", u.ID)
-		db.ExecContext(ctx, "DELETE FROM log_entry_sets WHERE log_entry_id IN (SELECT id FROM log_entries WHERE session_id IN (SELECT id FROM workout_sessions WHERE user_id = $1))", u.ID)
-		db.ExecContext(ctx, "DELETE FROM log_entries WHERE session_id IN (SELECT id FROM workout_sessions WHERE user_id = $1)", u.ID)
-		db.ExecContext(ctx, "DELETE FROM workout_sessions WHERE user_id = $1", u.ID)
-		db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID)
-	})
+	u := testutil.CreateTestUser(t, db, ctx, "pr-first")
 
 	exerciseRepo := exercise.NewRepo(db)
 	variant, err := exerciseRepo.Resolve(ctx, u.ID, "bench press", "standard")
@@ -79,18 +66,7 @@ func TestCheckAndCreatePRs_secondEntryBetterCelebrates(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "pr-second-" + uuid.New().String(), Email: "prs-" + uuid.New().String() + "@test.com", Name: "PR"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		db.ExecContext(ctx, "DELETE FROM personal_records WHERE user_id = $1", u.ID)
-		db.ExecContext(ctx, "DELETE FROM log_entry_sets WHERE log_entry_id IN (SELECT id FROM log_entries WHERE session_id IN (SELECT id FROM workout_sessions WHERE user_id = $1))", u.ID)
-		db.ExecContext(ctx, "DELETE FROM log_entries WHERE session_id IN (SELECT id FROM workout_sessions WHERE user_id = $1)", u.ID)
-		db.ExecContext(ctx, "DELETE FROM workout_sessions WHERE user_id = $1", u.ID)
-		db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID)
-	})
+	u := testutil.CreateTestUser(t, db, ctx, "pr-second")
 
 	exerciseRepo := exercise.NewRepo(db)
 	variant, err := exerciseRepo.Resolve(ctx, u.ID, "bench press", "standard")
@@ -154,18 +130,7 @@ func TestCheckAndCreatePRs_secondEntryWorseNoCelebration(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	userRepo := user.NewRepo(db)
-	u := &user.User{GoogleID: "pr-worse-" + uuid.New().String(), Email: "prw-" + uuid.New().String() + "@test.com", Name: "PR"}
-	if err := userRepo.Create(ctx, u); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		db.ExecContext(ctx, "DELETE FROM personal_records WHERE user_id = $1", u.ID)
-		db.ExecContext(ctx, "DELETE FROM log_entry_sets WHERE log_entry_id IN (SELECT id FROM log_entries WHERE session_id IN (SELECT id FROM workout_sessions WHERE user_id = $1))", u.ID)
-		db.ExecContext(ctx, "DELETE FROM log_entries WHERE session_id IN (SELECT id FROM workout_sessions WHERE user_id = $1)", u.ID)
-		db.ExecContext(ctx, "DELETE FROM workout_sessions WHERE user_id = $1", u.ID)
-		db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", u.ID)
-	})
+	u := testutil.CreateTestUser(t, db, ctx, "pr-worse")
 
 	exerciseRepo := exercise.NewRepo(db)
 	variant, err := exerciseRepo.Resolve(ctx, u.ID, "squat", "standard")
