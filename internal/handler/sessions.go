@@ -17,7 +17,7 @@ func SessionsList(sessionRepo *session.Repo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := auth.UserFromContext(r.Context())
 		if u == nil {
-			JSONError(w, "unauthorized", "unauthorized", http.StatusUnauthorized)
+			JSONError(w, r, "unauthorized", "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
@@ -30,7 +30,7 @@ func SessionsList(sessionRepo *session.Repo) http.HandlerFunc {
 
 		sessions, err := sessionRepo.ListByUser(r.Context(), u.ID, limit)
 		if err != nil {
-			JSONError(w, "internal error", "internal_error", http.StatusInternalServerError)
+			JSONError(w, r, "internal error", "internal_error", http.StatusInternalServerError)
 			return
 		}
 
@@ -52,34 +52,34 @@ func SessionDetail(sessionRepo *session.Repo, logentryRepo *logentry.Repo, exerc
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := auth.UserFromContext(r.Context())
 		if u == nil {
-			JSONError(w, "unauthorized", "unauthorized", http.StatusUnauthorized)
+			JSONError(w, r, "unauthorized", "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		idStr := r.PathValue("id")
 		if idStr == "" {
-			JSONError(w, "missing session id", "invalid_input", http.StatusBadRequest)
+			JSONError(w, r, "missing session id", "invalid_input", http.StatusBadRequest)
 			return
 		}
 		id, err := uuid.Parse(idStr)
 		if err != nil {
-			JSONError(w, "invalid session id", "invalid_input", http.StatusBadRequest)
+			JSONError(w, r, "invalid session id", "invalid_input", http.StatusBadRequest)
 			return
 		}
 
 		sess, err := sessionRepo.GetByID(r.Context(), id)
 		if err != nil {
-			JSONError(w, "internal error", "internal_error", http.StatusInternalServerError)
+			JSONError(w, r, "internal error", "internal_error", http.StatusInternalServerError)
 			return
 		}
 		if sess == nil || sess.UserID != u.ID {
-			JSONError(w, "not found", "not_found", http.StatusNotFound)
+			JSONError(w, r, "not found", "not_found", http.StatusNotFound)
 			return
 		}
 
 		entries, err := logentryRepo.ListBySession(r.Context(), sess.ID)
 		if err != nil {
-			JSONError(w, "internal error", "internal_error", http.StatusInternalServerError)
+			JSONError(w, r, "internal error", "internal_error", http.StatusInternalServerError)
 			return
 		}
 

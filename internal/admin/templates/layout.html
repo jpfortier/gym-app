@@ -50,6 +50,7 @@
     <a href="/admin/prs">PRs</a>
     <a href="/admin/usage">Usage</a>
     <a href="/admin/notes">Notes</a>
+    <a href="/admin/logs">Logs</a>
   </nav>
   {{end}}
   {{if eq .Page "dashboard"}}{{template "dashboard" .}}{{end}}
@@ -59,6 +60,7 @@
   {{if eq .Page "prs"}}{{template "prs" .}}{{end}}
   {{if eq .Page "usage"}}{{template "usage" .}}{{end}}
   {{if eq .Page "notes"}}{{template "notes" .}}{{end}}
+  {{if eq .Page "logs"}}{{template "logs" .}}{{end}}
 </body>
 </html>
 {{end}}

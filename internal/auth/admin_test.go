@@ -23,7 +23,7 @@ func TestRequireAdmin_nonAdminReturns403(t *testing.T) {
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: "google-123"}}
 	store := &mockUserStore{user: u}
 
-	handler := RequireAdmin(verifier, store, "test-client-id")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RequireAdmin(verifier, store, "test-client-id", nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("handler should not be called for non-admin")
 	}))
 
@@ -59,7 +59,7 @@ func TestRequireAdmin_adminPassesThrough(t *testing.T) {
 	store := &mockUserStore{user: u}
 
 	var handlerCalled bool
-	handler := RequireAdmin(verifier, store, "test-client-id")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RequireAdmin(verifier, store, "test-client-id", nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handlerCalled = true
 		cu := UserFromContext(r.Context())
 		if cu == nil || cu.Role != "admin" {

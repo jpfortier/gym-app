@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jpfortier/gym-app/internal/env"
 	"github.com/jpfortier/gym-app/internal/httputil"
+	"github.com/jpfortier/gym-app/internal/systemlog"
 	"github.com/jpfortier/gym-app/internal/user"
 	"google.golang.org/api/idtoken"
 )
@@ -39,27 +40,62 @@ func ContextWithUser(ctx context.Context, u *user.User) context.Context {
 
 // RequireAuth returns middleware that verifies the Google ID token, gets or creates
 // the user, and adds the user to the request context. Responds 401 if auth fails.
-func RequireAuth(verifier Verifier, userStore UserStore, googleClientID string) func(http.Handler) http.Handler {
+// logger may be nil to skip system logging.
+func RequireAuth(verifier Verifier, userStore UserStore, googleClientID string, logger systemlog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			method, path := r.Method, r.URL.Path
 			token := extractBearerToken(r)
 			if token == "" {
 				slog.Debug("auth: missing bearer token")
-				httputil.JSONError(w, "missing authorization", "missing_auth", http.StatusUnauthorized)
+				if logger != nil {
+					logger.Log(r.Context(), systemlog.InsertParams{
+						Category: systemlog.CategoryAuthFailure,
+						Method:   method,
+						Path:     path,
+						Details:  map[string]interface{}{"reason": "missing_auth"},
+					})
+				}
+				httputil.JSONError(w, r, "missing authorization", "missing_auth", http.StatusUnauthorized)
 				return
 			}
 
 			if env.DevMode() && strings.HasPrefix(token, "dev:") {
 				email := strings.TrimSpace(strings.TrimPrefix(token, "dev:"))
 				if email == "" {
-					httputil.JSONError(w, "dev token requires email", "invalid_token", http.StatusUnauthorized)
+					if logger != nil {
+						logger.Log(r.Context(), systemlog.InsertParams{
+							Category: systemlog.CategoryAuthFailure,
+							Method:   method,
+							Path:     path,
+							Details:  map[string]interface{}{"reason": "invalid_token", "msg": "dev token requires email"},
+						})
+					}
+					httputil.JSONError(w, r, "dev token requires email", "invalid_token", http.StatusUnauthorized)
 					return
 				}
 				u, err := getOrCreateDevUser(r.Context(), userStore, email)
 				if err != nil {
 					slog.Error("auth: dev user", "err", err)
-					httputil.JSONError(w, "internal error", "internal_error", http.StatusInternalServerError)
+					if logger != nil {
+						logger.Log(r.Context(), systemlog.InsertParams{
+							Category: systemlog.CategoryAuthFailure,
+							Method:   method,
+							Path:     path,
+							Error:   err.Error(),
+						})
+					}
+					httputil.JSONError(w, r, "internal error", "internal_error", http.StatusInternalServerError)
 					return
+				}
+				if logger != nil {
+					logger.Log(r.Context(), systemlog.InsertParams{
+						Category: systemlog.CategoryAuthSuccess,
+						UserID:   &u.ID,
+						Method:   method,
+						Path:     path,
+						Details:  map[string]interface{}{"email": u.Email, "method": "dev"},
+					})
 				}
 				ctx := context.WithValue(r.Context(), userContextKey, u)
 				next.ServeHTTP(w, r.WithContext(ctx))
@@ -69,17 +105,43 @@ func RequireAuth(verifier Verifier, userStore UserStore, googleClientID string) 
 			payload, err := verifier.Verify(r.Context(), token, googleClientID)
 			if err != nil {
 				slog.Debug("auth: invalid token", "err", err)
-				httputil.JSONError(w, "invalid token", "invalid_token", http.StatusUnauthorized)
+				if logger != nil {
+					logger.Log(r.Context(), systemlog.InsertParams{
+						Category: systemlog.CategoryAuthFailure,
+						Method:   method,
+						Path:     path,
+						Details:  map[string]interface{}{"reason": "invalid_token"},
+						Error:   err.Error(),
+					})
+				}
+				httputil.JSONError(w, r, "invalid token", "invalid_token", http.StatusUnauthorized)
 				return
 			}
 
 			u, err := getOrCreateUser(r.Context(), userStore, payload)
 			if err != nil {
 				slog.Error("auth: get or create user", "err", err)
-				httputil.JSONError(w, "internal error", "internal_error", http.StatusInternalServerError)
+				if logger != nil {
+					logger.Log(r.Context(), systemlog.InsertParams{
+						Category: systemlog.CategoryAuthFailure,
+						Method:   method,
+						Path:     path,
+						Error:   err.Error(),
+					})
+				}
+				httputil.JSONError(w, r, "internal error", "internal_error", http.StatusInternalServerError)
 				return
 			}
 
+			if logger != nil {
+				logger.Log(r.Context(), systemlog.InsertParams{
+					Category: systemlog.CategoryAuthSuccess,
+					UserID:   &u.ID,
+					Method:   method,
+					Path:     path,
+					Details:  map[string]interface{}{"email": u.Email, "method": "google"},
+				})
+			}
 			ctx := context.WithValue(r.Context(), userContextKey, u)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

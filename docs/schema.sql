@@ -124,6 +124,20 @@ CREATE UNIQUE INDEX idx_exercise_aliases_global ON exercise_aliases (alias_key) 
 CREATE UNIQUE INDEX idx_exercise_aliases_user ON exercise_aliases (user_id, alias_key) WHERE user_id IS NOT NULL;
 CREATE INDEX idx_exercise_aliases_lookup ON exercise_aliases (alias_key);
 
+CREATE TABLE system_logs (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    category text NOT NULL,
+    user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+    method text,
+    path text,
+    details jsonb,
+    error text
+);
+CREATE INDEX idx_system_logs_created_at ON system_logs(created_at DESC);
+CREATE INDEX idx_system_logs_category ON system_logs(category);
+CREATE INDEX idx_system_logs_user_id ON system_logs(user_id) WHERE user_id IS NOT NULL;
+
 CREATE TABLE chat_messages (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,

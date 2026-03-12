@@ -13,11 +13,11 @@ import (
 // Returns {"token": "dev:test@example.com"}. Use as Authorization: Bearer <token>
 func DevToken(w http.ResponseWriter, r *http.Request) {
 	if !env.DevMode() {
-		JSONError(w, "not available", "not_found", http.StatusNotFound)
+		JSONError(w, r, "not available", "not_found", http.StatusNotFound)
 		return
 	}
 	if r.Method != http.MethodGet {
-		JSONError(w, "method not allowed", "method_not_allowed", http.StatusMethodNotAllowed)
+		JSONError(w, r, "method not allowed", "method_not_allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	email := strings.TrimSpace(r.URL.Query().Get("email"))

@@ -14,12 +14,12 @@ import (
 func ChatMessages(chatMessagesRepo *chatmessages.Repo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
-			JSONError(w, "method not allowed", "method_not_allowed", http.StatusMethodNotAllowed)
+			JSONError(w, r, "method not allowed", "method_not_allowed", http.StatusMethodNotAllowed)
 			return
 		}
 		u := auth.UserFromContext(r.Context())
 		if u == nil {
-			JSONError(w, "unauthorized", "unauthorized", http.StatusUnauthorized)
+			JSONError(w, r, "unauthorized", "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
@@ -38,13 +38,13 @@ func ChatMessages(chatMessagesRepo *chatmessages.Repo) http.HandlerFunc {
 		} else {
 			beforeID, parseErr := uuid.Parse(beforeStr)
 			if parseErr != nil {
-				JSONError(w, "invalid before id", "invalid_input", http.StatusBadRequest)
+				JSONError(w, r, "invalid before id", "invalid_input", http.StatusBadRequest)
 				return
 			}
 			msgs, err = chatMessagesRepo.ListOlder(r.Context(), u.ID, beforeID, limit)
 		}
 		if err != nil {
-			JSONError(w, "internal error", "internal_error", http.StatusInternalServerError)
+			JSONError(w, r, "internal error", "internal_error", http.StatusInternalServerError)
 			return
 		}
 

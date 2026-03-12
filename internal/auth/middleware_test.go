@@ -16,7 +16,7 @@ import (
 func TestRequireAuth_missingAuthorization(t *testing.T) {
 	verifier := &mockVerifier{}
 	store := &mockUserStore{}
-	handler := RequireAuth(verifier, store, "test-client-id")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RequireAuth(verifier, store, "test-client-id", nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("handler should not be called")
 	}))
 
@@ -46,7 +46,7 @@ func TestRequireAuth_missingAuthorization(t *testing.T) {
 func TestRequireAuth_malformedBearer(t *testing.T) {
 	verifier := &mockVerifier{}
 	store := &mockUserStore{}
-	handler := RequireAuth(verifier, store, "test-client-id")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RequireAuth(verifier, store, "test-client-id", nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("handler should not be called")
 	}))
 
@@ -66,7 +66,7 @@ func TestRequireAuth_malformedBearer(t *testing.T) {
 func TestRequireAuth_invalidToken(t *testing.T) {
 	verifier := &mockVerifier{err: errInvalidToken}
 	store := &mockUserStore{}
-	handler := RequireAuth(verifier, store, "test-client-id")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RequireAuth(verifier, store, "test-client-id", nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("handler should not be called")
 	}))
 
@@ -104,7 +104,7 @@ func TestRequireAuth_validToken_existingUser(t *testing.T) {
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: "google-123"}}
 	store := &mockUserStore{user: existingUser}
 	var capturedUser *user.User
-	handler := RequireAuth(verifier, store, "test-client-id")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RequireAuth(verifier, store, "test-client-id", nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedUser = UserFromContext(r.Context())
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
@@ -148,7 +148,7 @@ func TestRequireAuth_validToken_createsNewUser(t *testing.T) {
 	}
 	store := &mockUserStore{}
 	var capturedUser *user.User
-	handler := RequireAuth(verifier, store, "test-client-id")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RequireAuth(verifier, store, "test-client-id", nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedUser = UserFromContext(r.Context())
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
@@ -205,7 +205,7 @@ func TestRequireAuth_validToken_reusesUserByEmail(t *testing.T) {
 		},
 	}
 	var capturedUser *user.User
-	handler := RequireAuth(verifier, store, "test-client-id")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RequireAuth(verifier, store, "test-client-id", nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedUser = UserFromContext(r.Context())
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))

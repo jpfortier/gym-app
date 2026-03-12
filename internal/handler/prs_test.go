@@ -41,7 +41,7 @@ func TestPRsList_returnsUserPRs(t *testing.T) {
 	exerciseRepo := exercise.NewRepo(db)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
-	mux.Handle("GET /prs", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(PRsList(prRepo, exerciseRepo))))
+	mux.Handle("GET /prs", auth.RequireAuth(verifier, userRepo, "aud", nil)(http.HandlerFunc(PRsList(prRepo, exerciseRepo))))
 
 	req := httptest.NewRequest(http.MethodGet, "/prs", nil)
 	req.Header.Set("Authorization", "Bearer x")
@@ -85,7 +85,7 @@ func TestPRImage_returns404WhenImageNotReady(t *testing.T) {
 
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
-	mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(PRImage(prRepo, nil))))
+	mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userRepo, "aud", nil)(http.HandlerFunc(PRImage(prRepo, nil))))
 
 	req := httptest.NewRequest(http.MethodGet, "/prs/"+prRec.ID.String()+"/image", nil)
 	req.Header.Set("Authorization", "Bearer x")
@@ -123,7 +123,7 @@ func TestPRImage_returns404WhenWrongUser(t *testing.T) {
 
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u2.GoogleID}}
 	mux := http.NewServeMux()
-	mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(PRImage(prRepo, nil))))
+	mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userRepo, "aud", nil)(http.HandlerFunc(PRImage(prRepo, nil))))
 
 	req := httptest.NewRequest(http.MethodGet, "/prs/"+prRec.ID.String()+"/image", nil)
 	req.Header.Set("Authorization", "Bearer x")
@@ -145,7 +145,7 @@ func TestPRImage_returns404WhenNotFound(t *testing.T) {
 	prRepo := pr.NewRepo(db)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
-	mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(PRImage(prRepo, nil))))
+	mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userRepo, "aud", nil)(http.HandlerFunc(PRImage(prRepo, nil))))
 
 	fakeID := uuid.New().String()
 	req := httptest.NewRequest(http.MethodGet, "/prs/"+fakeID+"/image", nil)
@@ -165,7 +165,7 @@ func TestPRImage_returns401WhenUnauthorized(t *testing.T) {
 	userRepo := user.NewRepo(db)
 	prRepo := pr.NewRepo(db)
 	mux := http.NewServeMux()
-	mux.Handle("GET /prs/{id}/image", auth.RequireAuth(&mockVerifier{}, userRepo, "aud")(http.HandlerFunc(PRImage(prRepo, nil))))
+	mux.Handle("GET /prs/{id}/image", auth.RequireAuth(&mockVerifier{}, userRepo, "aud", nil)(http.HandlerFunc(PRImage(prRepo, nil))))
 
 	req := httptest.NewRequest(http.MethodGet, "/prs/"+uuid.New().String()+"/image", nil)
 	rec := httptest.NewRecorder()
@@ -186,7 +186,7 @@ func TestPRImage_returns400WhenInvalidID(t *testing.T) {
 	prRepo := pr.NewRepo(db)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
-	mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(PRImage(prRepo, nil))))
+	mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userRepo, "aud", nil)(http.HandlerFunc(PRImage(prRepo, nil))))
 
 	req := httptest.NewRequest(http.MethodGet, "/prs/not-a-uuid/image", nil)
 	req.Header.Set("Authorization", "Bearer x")
@@ -223,7 +223,7 @@ func TestPRImage_returns503WhenR2NotConfigured(t *testing.T) {
 
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
-	mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(PRImage(prRepo, nil))))
+	mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userRepo, "aud", nil)(http.HandlerFunc(PRImage(prRepo, nil))))
 
 	req := httptest.NewRequest(http.MethodGet, "/prs/"+prRec.ID.String()+"/image", nil)
 	req.Header.Set("Authorization", "Bearer x")

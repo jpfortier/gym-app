@@ -50,7 +50,7 @@ func TestQueryHistory_returnsEntries(t *testing.T) {
 	queryService := query.NewService(exerciseRepo, logentryRepo, sessionRepo)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
-	mux.Handle("GET /query", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(QueryHistory(queryService, exerciseRepo))))
+	mux.Handle("GET /query", auth.RequireAuth(verifier, userRepo, "aud", nil)(http.HandlerFunc(QueryHistory(queryService, exerciseRepo))))
 
 	req := httptest.NewRequest(http.MethodGet, "/query?category=bench+press&variant=standard", nil)
 	req.Header.Set("Authorization", "Bearer x")
@@ -84,7 +84,7 @@ func TestQueryHistory_missingCategoryReturns400(t *testing.T) {
 	queryService := query.NewService(exerciseRepo, logentryRepo, sessionRepo)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
-	mux.Handle("GET /query", auth.RequireAuth(verifier, userRepo, "aud")(http.HandlerFunc(QueryHistory(queryService, exerciseRepo))))
+	mux.Handle("GET /query", auth.RequireAuth(verifier, userRepo, "aud", nil)(http.HandlerFunc(QueryHistory(queryService, exerciseRepo))))
 
 	req := httptest.NewRequest(http.MethodGet, "/query", nil)
 	req.Header.Set("Authorization", "Bearer x")

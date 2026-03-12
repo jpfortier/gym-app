@@ -12,13 +12,13 @@ func ExercisesList(exerciseRepo *exercise.Repo) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := auth.UserFromContext(r.Context())
 		if u == nil {
-			JSONError(w, "unauthorized", "unauthorized", http.StatusUnauthorized)
+			JSONError(w, r, "unauthorized", "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		categories, err := exerciseRepo.ListCategoriesForUser(r.Context(), u.ID)
 		if err != nil {
-			JSONError(w, "internal error", "internal_error", http.StatusInternalServerError)
+			JSONError(w, r, "internal error", "internal_error", http.StatusInternalServerError)
 			return
 		}
 
@@ -26,7 +26,7 @@ func ExercisesList(exerciseRepo *exercise.Repo) http.HandlerFunc {
 		for _, c := range categories {
 			variants, err := exerciseRepo.ListVariantsByCategory(r.Context(), c.ID, u.ID)
 			if err != nil {
-				JSONError(w, "internal error", "internal_error", http.StatusInternalServerError)
+				JSONError(w, r, "internal error", "internal_error", http.StatusInternalServerError)
 				return
 			}
 			for _, v := range variants {

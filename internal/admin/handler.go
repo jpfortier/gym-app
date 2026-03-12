@@ -4,6 +4,7 @@ import (
 	"context"
 	"html/template"
 	"net/http"
+	"strconv"
 
 	"github.com/google/uuid"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/jpfortier/gym-app/internal/notes"
 	"github.com/jpfortier/gym-app/internal/pr"
 	"github.com/jpfortier/gym-app/internal/session"
+	"github.com/jpfortier/gym-app/internal/systemlog"
 	"github.com/jpfortier/gym-app/internal/usage"
 	"github.com/jpfortier/gym-app/internal/user"
 )
@@ -41,6 +43,7 @@ type Handler struct {
 	UsageRepo        *usage.Repo
 	NotesRepo        *notes.Repo
 	ChatMessagesRepo *chatmessages.Repo
+	SystemlogRepo    *systemlog.Repo
 	Templates        *template.Template
 }
 
@@ -307,6 +310,46 @@ func (h *Handler) Notes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ld.Data = map[string]interface{}{"Notes": notesList}
+	if err := h.Templates.ExecuteTemplate(w, "layout", ld); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// Logs handles GET /admin/logs.
+func (h *Handler) Logs(w http.ResponseWriter, r *http.Request) {
+	ld, err := h.layoutData(r, "System Logs", "logs", "logs", false)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if h.SystemlogRepo == nil {
+		ld.Data = map[string]interface{}{"Logs": []systemlog.Entry{}, "Error": "system logs not available"}
+		_ = h.Templates.ExecuteTemplate(w, "layout", ld)
+		return
+	}
+	params := systemlog.ListParams{Limit: 100}
+	category := r.URL.Query().Get("category")
+	if category != "" {
+		params.Category = category
+	}
+	var filterUserIDStr string
+	if uid := r.URL.Query().Get("user_id"); uid != "" {
+		if id, err := uuid.Parse(uid); err == nil {
+			params.UserID = &id
+			filterUserIDStr = id.String()
+		}
+	}
+	if offset := r.URL.Query().Get("offset"); offset != "" {
+		if o, err := strconv.Atoi(offset); err == nil && o >= 0 {
+			params.Offset = o
+		}
+	}
+	entries, err := h.SystemlogRepo.List(r.Context(), params)
+	if err != nil {
+		ld.Data = map[string]interface{}{"Logs": []systemlog.Entry{}, "Error": err.Error(), "Category": category, "UserID": filterUserIDStr}
+	} else {
+		ld.Data = map[string]interface{}{"Logs": entries, "Error": "", "Category": category, "UserID": filterUserIDStr}
+	}
 	if err := h.Templates.ExecuteTemplate(w, "layout", ld); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

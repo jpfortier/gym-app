@@ -12,12 +12,12 @@ import (
 func Chat(chatSvc *chat.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			JSONError(w, "method not allowed", "method_not_allowed", http.StatusMethodNotAllowed)
+			JSONError(w, r, "method not allowed", "method_not_allowed", http.StatusMethodNotAllowed)
 			return
 		}
 		u := auth.UserFromContext(r.Context())
 		if u == nil {
-			JSONError(w, "unauthorized", "unauthorized", http.StatusUnauthorized)
+			JSONError(w, r, "unauthorized", "unauthorized", http.StatusUnauthorized)
 			return
 		}
 		var req struct {
@@ -26,13 +26,13 @@ func Chat(chatSvc *chat.Service) http.HandlerFunc {
 			AudioFormat string `json:"audio_format"` // e.g. "m4a", "webm" - optional
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			JSONError(w, "invalid JSON", "invalid_input", http.StatusBadRequest)
+			JSONError(w, r, "invalid JSON", "invalid_input", http.StatusBadRequest)
 			return
 		}
 		resp, err := chatSvc.Process(r.Context(), u, req.Text, req.AudioBase64, req.AudioFormat)
 		if err != nil {
 			slog.Error("chat process failed", "err", err)
-			JSONError(w, "Processing failed", "internal_error", http.StatusInternalServerError)
+			JSONError(w, r, "Processing failed", "internal_error", http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
