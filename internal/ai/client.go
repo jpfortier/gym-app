@@ -146,12 +146,6 @@ func (c *Client) chatWithToolsMock(messages []ChatMessage, tools []openai.Tool) 
 		if strings.HasPrefix(lastToolContent, "success: ") {
 			return strings.TrimPrefix(lastToolContent, "success: "), nil, nil
 		}
-		if strings.Contains(lastToolContent, "Scratched") {
-			return "Scratched.", nil, nil
-		}
-		if strings.Contains(lastToolContent, "Back in") {
-			return "Back in.", nil, nil
-		}
 		return "Logged bench press **135×8** for today.", nil, nil
 	}
 	if len(tools) > 0 {

@@ -13,6 +13,7 @@ import (
 
 	"google.golang.org/api/idtoken"
 
+	"github.com/google/uuid"
 	"github.com/jpfortier/gym-app/internal/ai"
 	"github.com/jpfortier/gym-app/internal/auth"
 	"github.com/jpfortier/gym-app/internal/chat"
@@ -161,6 +162,12 @@ func TestChat_removeIntent(t *testing.T) {
 		t.Fatalf("log: got status %d: %s", rec.Code, rec.Body.String())
 	}
 
+	// Get bench entry for today (assert on DB state, not message text)
+	benchEntryID, benchDisabledAt := getBenchEntryForToday(t, db, ctx, u.ID)
+	if benchEntryID == "" {
+		t.Fatal("expected bench entry after log, none found")
+	}
+
 	body, _ = json.Marshal(map[string]string{"text": "forget that bench"})
 	req = httptest.NewRequest(http.MethodPost, "/chat", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer x")
@@ -171,12 +178,9 @@ func TestChat_removeIntent(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Errorf("remove: got status %d: %s", rec.Code, rec.Body.String())
 	}
-	var out map[string]interface{}
-	if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
-		t.Fatal(err)
-	}
-	if msg, _ := out["message"].(string); msg != "Scratched." {
-		t.Errorf("got message %v, want Scratched.", out["message"])
+	_, benchDisabledAt = getBenchEntryForToday(t, db, ctx, u.ID)
+	if benchDisabledAt == nil {
+		t.Error("remove: expected bench entry to be disabled (disabled_at set)")
 	}
 
 	body, _ = json.Marshal(map[string]string{"text": "oh sorry bring that bench back"})
@@ -189,12 +193,37 @@ func TestChat_removeIntent(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Errorf("restore: got status %d: %s", rec.Code, rec.Body.String())
 	}
-	if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
-		t.Fatal(err)
+	_, benchDisabledAt = getBenchEntryForToday(t, db, ctx, u.ID)
+	if benchDisabledAt != nil {
+		t.Error("restore: expected bench entry to be re-enabled (disabled_at null)")
 	}
-	if msg, _ := out["message"].(string); msg != "Back in." {
-		t.Errorf("got message %v, want Back in.", out["message"])
+}
+
+func getBenchEntryForToday(t *testing.T, db *sql.DB, ctx context.Context, userID uuid.UUID) (entryID string, disabledAt *time.Time) {
+	t.Helper()
+	today := time.Now().Format("2006-01-02")
+	var id string
+	var disAt sql.NullTime
+	err := db.QueryRowContext(ctx,
+		`SELECT le.id, le.disabled_at FROM log_entries le
+		 JOIN workout_sessions ws ON le.session_id = ws.id
+		 JOIN exercise_variants ev ON le.exercise_variant_id = ev.id
+		 JOIN exercise_categories ec ON ev.category_id = ec.id
+		 WHERE ws.user_id = $1 AND ws.date = $2::date
+		 AND LOWER(ec.name) = 'bench press'
+		 ORDER BY le.created_at DESC LIMIT 1`,
+		userID, today,
+	).Scan(&id, &disAt)
+	if err == sql.ErrNoRows {
+		return "", nil
 	}
+	if err != nil {
+		t.Fatalf("getBenchEntryForToday: %v", err)
+	}
+	if disAt.Valid {
+		return id, &disAt.Time
+	}
+	return id, nil
 }
 
 func TestChat_contextStoresMessages(t *testing.T) {
