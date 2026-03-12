@@ -363,7 +363,7 @@ func (s *Service) runExecuteCommands(ctx context.Context, userID uuid.UUID, wc *
 			prs = append(prs, PRResult{ID: p.ID, Exercise: p.Exercise, Variant: p.Variant, Weight: p.Weight, Reps: p.Reps, PRType: p.PRType})
 			if s.r2 != nil {
 				prRec := &pr.PersonalRecord{ID: uuid.MustParse(p.ID), UserID: userID, Weight: p.Weight, Reps: p.Reps, PRType: p.PRType}
-				s.generateAndUploadPRImage(ctx, userID, prRec, p.Exercise)
+				s.generateAndUploadPRImage(ctx, userID, prRec, p.Exercise, p.Variant)
 			}
 		}
 	}
@@ -419,11 +419,24 @@ func (s *Service) appendMessages(ctx context.Context, userID uuid.UUID, userText
 	_ = s.chatMessagesRepo.Append(ctx, userID, "assistant", assistantMessage)
 }
 
-func (s *Service) generateAndUploadPRImage(ctx context.Context, userID uuid.UUID, p *pr.PersonalRecord, exerciseName string) {
+func (s *Service) generateAndUploadPRImage(ctx context.Context, userID uuid.UUID, p *pr.PersonalRecord, categoryName, variantName string) {
 	if s.r2 == nil {
 		return
 	}
-	img, err := s.client.GeneratePRImage(ctx, userID, exerciseName, p.Weight, p.Reps, p.PRType)
+	exerciseName := variantName
+	visualCues := ""
+	if s.exerciseRepo != nil {
+		variant, err := s.exerciseRepo.Resolve(ctx, userID, categoryName, variantName)
+		if err == nil && variant != nil {
+			exerciseName = variant.Name
+			visualCues = variant.VisualCues
+		} else if variantName == "" {
+			exerciseName = categoryName
+		}
+	} else if variantName == "" {
+		exerciseName = categoryName
+	}
+	img, err := s.client.GeneratePRImage(ctx, userID, exerciseName, p.Weight, p.Reps, p.PRType, visualCues)
 	if err != nil {
 		slog.Warn("pr image generation failed", "pr_id", p.ID, "err", err)
 		return

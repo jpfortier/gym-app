@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -38,7 +39,7 @@ type imagesEditResponse struct {
 }
 
 // buildPRImagePrompt returns a rich prompt from pr-image-prompt.md style.
-func buildPRImagePrompt(exerciseName string, weight float64, reps *int, prType string) string {
+func buildPRImagePrompt(exerciseName string, weight float64, reps *int, prType string, visualCues string) string {
 	action := "performing " + exerciseName
 	var numberCue string
 	if weight > 0 {
@@ -48,11 +49,16 @@ func buildPRImagePrompt(exerciseName string, weight float64, reps *int, prType s
 	} else {
 		numberCue = "Show the PR number prominently on weights, signage, or a scoreboard."
 	}
-	return fmt.Sprintf(`Place this character in a gritty industrial warehouse gym / train yard setting. %s. %s Concrete floor, metal, strip lights. Bold cartoon/comic style, slight vintage grunge texture. Yellow/orange train, red/blue freight cars, industrial grays. Celebrating a new personal record. Keep the character consistent with the reference images.`, action, numberCue)
+	prompt := fmt.Sprintf(`Place this character in a gritty industrial warehouse gym / train yard setting. %s. %s Concrete floor, metal, strip lights. Bold cartoon/comic style, slight vintage grunge texture. Yellow/orange train, red/blue freight cars, industrial grays. Celebrating a new personal record. Keep the character consistent with the reference images.`, action, numberCue)
+	if visualCues != "" {
+		cues := strings.ReplaceAll(strings.TrimSpace(visualCues), "\n", "; ")
+		prompt += fmt.Sprintf(" Visual cues for this exercise (use these to depict it correctly): %s.", cues)
+	}
+	return prompt
 }
 
 // GeneratePRImage creates a PR celebration image using gpt-image-1.5 Edit API with reference images.
-func (c *Client) GeneratePRImage(ctx context.Context, userID uuid.UUID, exerciseName string, weight float64, reps *int, prType string) ([]byte, error) {
+func (c *Client) GeneratePRImage(ctx context.Context, userID uuid.UUID, exerciseName string, weight float64, reps *int, prType string, visualCues string) ([]byte, error) {
 	if c.testMode {
 		return nil, nil
 	}
@@ -70,7 +76,7 @@ func (c *Client) GeneratePRImage(ctx context.Context, userID uuid.UUID, exercise
 	for i, id := range refIDs {
 		images[i] = imagesEditImage{FileID: id}
 	}
-	prompt := buildPRImagePrompt(exerciseName, weight, reps, prType)
+	prompt := buildPRImagePrompt(exerciseName, weight, reps, prType, visualCues)
 	body := imagesEditRequest{
 		Model:         "gpt-image-1.5",
 		Images:        images,

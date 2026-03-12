@@ -108,11 +108,12 @@ Request body:
 {
   "profile_id": "yellow-train-pr",
   "exercise": "rack pull",
-  "weight_lbs": 370
+  "weight_lbs": 370,
+  "visual_cues": "bar on rack pins; power rack visible; short deadlift range"
 }
 ```
 
-That is the only dynamic input needed right now.
+`visual_cues` is optional; when present it gives the image generator hints for depicting the exercise correctly. It may be empty for custom/user exercises.
 
 ## Prompt template to create in OpenAI
 
@@ -132,6 +133,7 @@ Style and character:
 Exercise to depict:
 - Exercise: {{exercise}}
 - Weight: {{weight_lbs}} lb
+- Visual cues (use these to depict the exercise correctly): {{visual_cues}}
 
 Requirements:
 - The scene must clearly depict the named exercise correctly, not a generic gym movement.
@@ -143,7 +145,7 @@ Requirements:
 - Vertical poster style for a phone screen.
 ```
 
-This keeps the fixed style instructions in OpenAI and leaves only `exercise` and `weight_lbs` as runtime variables.
+This keeps the fixed style instructions in OpenAI and leaves `exercise`, `weight_lbs`, and `visual_cues` as runtime variables. When `visual_cues` is empty (e.g. for custom exercises), omit that line or pass an empty string.
 
 ## Upload the reference images once
 
@@ -193,7 +195,8 @@ OpenAI documents that Responses accepts image inputs by file ID, and that image 
     "version": "3",
     "variables": {
       "exercise": "rack pull",
-      "weight_lbs": "370"
+      "weight_lbs": "370",
+      "visual_cues": "bar on rack pins; power rack visible; short deadlift range"
     }
   },
   "input": [
@@ -253,9 +256,10 @@ type Profile struct {
 }
 
 type GeneratePRImageInput struct {
-	Exercise  string
-	WeightLbs int
-	Profile   Profile
+	Exercise    string
+	WeightLbs   int
+	VisualCues   string
+	Profile     Profile
 }
 
 func GeneratePRImage(ctx context.Context, apiKey string, in GeneratePRImageInput) ([]byte, error) {
@@ -276,8 +280,9 @@ func GeneratePRImage(ctx context.Context, apiKey string, in GeneratePRImageInput
 		Prompt: openai.ResponsePromptParam{
 			ID: openai.String(in.Profile.PromptTemplateID),
 			Variables: map[string]interface{}{
-				"exercise":   in.Exercise,
-				"weight_lbs": fmt.Sprintf("%d", in.WeightLbs),
+				"exercise":     in.Exercise,
+				"weight_lbs":   fmt.Sprintf("%d", in.WeightLbs),
+				"visual_cues":  in.VisualCues,
 			},
 		},
 		Input: []openai.ResponseInputItemUnionParam{
@@ -345,7 +350,8 @@ curl https://api.openai.com/v1/responses \
       "version": "3",
       "variables": {
         "exercise": "rack pull",
-        "weight_lbs": "370"
+        "weight_lbs": "370",
+        "visual_cues": "bar on rack pins; power rack visible; short deadlift range"
       }
     },
     "input": [
@@ -411,7 +417,8 @@ Use:
 5. Build **POST /internal/pr-image**.
 6. On request:
    - load the profile
-   - send `exercise` and `weight_lbs` as prompt variables
+   - resolve the exercise variant to get `visual_cues` from `exercise_variants.visual_cues`
+   - send `exercise`, `weight_lbs`, and `visual_cues` as prompt variables
    - attach the saved reference `file_ids` as `input_image`
    - call Responses API with `tools: [{type: "image_generation"}]`
    - Return the generated image bytes to the app.
