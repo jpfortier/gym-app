@@ -126,7 +126,7 @@ func NewServer(ctx context.Context) (*Server, error) {
 	mux.HandleFunc("GET /health", handler.Health(database))
 	mux.HandleFunc("GET /dev/token", handler.DevToken)
 	mux.Handle("GET /me", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.Me))))
-	mux.Handle("GET /chat/messages", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.ChatMessages(chatMessagesRepo)))))
+	mux.Handle("GET /chat/messages", httputil.ETag(auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.ChatMessages(chatMessagesRepo))))))
 	mux.Handle("POST /chat", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.Chat(chatSvc)))))
 	mux.Handle("GET /sessions", httputil.ETag(auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.SessionsList(sessionRepo))))))
 	mux.Handle("GET /sessions/{id}", httputil.ETag(auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.SessionDetail(sessionRepo, logentryRepo, exerciseRepo))))))
