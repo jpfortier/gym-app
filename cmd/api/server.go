@@ -18,6 +18,7 @@ import (
 	"github.com/jpfortier/gym-app/internal/env"
 	"github.com/jpfortier/gym-app/internal/exercise"
 	"github.com/jpfortier/gym-app/internal/handler"
+	"github.com/jpfortier/gym-app/internal/httputil"
 	"github.com/jpfortier/gym-app/internal/logentry"
 	"github.com/jpfortier/gym-app/internal/name"
 	"github.com/jpfortier/gym-app/internal/notes"
@@ -127,11 +128,11 @@ func NewServer(ctx context.Context) (*Server, error) {
 	mux.Handle("GET /me", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.Me))))
 	mux.Handle("GET /chat/messages", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.ChatMessages(chatMessagesRepo)))))
 	mux.Handle("POST /chat", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.Chat(chatSvc)))))
-	mux.Handle("GET /sessions", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.SessionsList(sessionRepo)))))
-	mux.Handle("GET /sessions/{id}", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.SessionDetail(sessionRepo, logentryRepo, exerciseRepo)))))
-	mux.Handle("GET /exercises", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.ExercisesList(exerciseRepo)))))
-	mux.Handle("GET /query", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.QueryHistory(queryService, exerciseRepo)))))
-	mux.Handle("GET /prs", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.PRsList(prRepo, exerciseRepo)))))
+	mux.Handle("GET /sessions", httputil.ETag(auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.SessionsList(sessionRepo))))))
+	mux.Handle("GET /sessions/{id}", httputil.ETag(auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.SessionDetail(sessionRepo, logentryRepo, exerciseRepo))))))
+	mux.Handle("GET /exercises", httputil.ETag(auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.ExercisesList(exerciseRepo))))))
+	mux.Handle("GET /query", httputil.ETag(auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.QueryHistory(queryService, exerciseRepo))))))
+	mux.Handle("GET /prs", httputil.ETag(auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.PRsList(prRepo, exerciseRepo))))))
 	if r2 != nil {
 		mux.Handle("GET /prs/{id}/image", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.PRImage(prRepo, r2)))))
 	}
@@ -167,7 +168,8 @@ func NewServer(ctx context.Context) (*Server, error) {
 	mux.Handle("GET /admin/notes", adminWithCookie(logAction(http.HandlerFunc(adminHandler.Notes))))
 	mux.Handle("GET /admin/logs", adminWithCookie(logAction(http.HandlerFunc(adminHandler.Logs))))
 
-	handler := systemlog.RecoverPanic(syslog)(systemlog.AddLoggerToContext(syslog)(mux))
+	h := systemlog.RecoverPanic(syslog)(systemlog.AddLoggerToContext(syslog)(mux))
+	handler := httputil.Gzip(h)
 	return &Server{mux: mux, handler: handler, db: database}, nil
 }
 
