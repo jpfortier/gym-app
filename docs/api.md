@@ -44,9 +44,15 @@ All log creation goes through POST /chat. No manual write endpoint. See `docs/an
 ## POST /chat
 
 - **Request:** `{ "text": "..." }` or `{ "audio_base64": "..." }` (optional `audio_format`, e.g. `"m4a"`)
-- **Response:** Varies by intent (log, query, correction, remove, note). Server infers via LLM.
+- **Response (text):** Full response with message, entries, history, prs. Server infers intent via LLM.
+- **Response (audio):** Returns immediately with `{ "job_id": "uuid", "text": "transcribed...", "status": "processing" }`. Poll `GET /chat/jobs/{job_id}` for the LLM result. Show `text` in UI right away.
 - **Auth:** `Authorization: Bearer <google_id_token>`
 - **Throttling:** Per-user rate limits. See `docs/ai-throttling.md`. Set `GYM_OPENAI_TEST_MODE=true` for tests.
+
+## GET /chat/jobs/{id}
+
+- **Purpose:** Poll for async chat job completion (audio input).
+- **Response:** `{ "job_id": "...", "text": "...", "status": "processing"|"complete"|"failed", "result": {...}, "error": "..." }`. When `status` is `complete`, `result` has the same shape as POST /chat text response.
 
 **Exercise resolution (log intent):** Resolves exercise names (e.g. "RDL") to category/variant. Order: exact match → user alias lookup → embedding similarity → create new. When we resolve via embedding or create, we store the alias so future lookups skip the LLM.
 

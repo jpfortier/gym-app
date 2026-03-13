@@ -67,6 +67,7 @@ type Config struct {
 	R2               *storage.R2
 	CommandExecutor  *command.Executor
 	Systemlog        systemlog.Logger
+	JobStore         *JobStore
 }
 
 type Service struct {
@@ -78,9 +79,10 @@ type Service struct {
 	prRepo            *pr.Repo
 	chatMessagesRepo  *chatmessages.Repo
 	r2                *storage.R2
-	workoutCtxBuilder  *workoutcontext.Builder
-	commandExecutor   *command.Executor
+	workoutCtxBuilder *workoutcontext.Builder
+	commandExecutor  *command.Executor
 	systemlog         systemlog.Logger
+	jobStore         *JobStore
 }
 
 func NewService(cfg Config) *Service {
@@ -100,38 +102,87 @@ func NewService(cfg Config) *Service {
 		workoutCtxBuilder:  wcBuilder,
 		commandExecutor:   cfg.CommandExecutor,
 		systemlog:         cfg.Systemlog,
+		jobStore:          cfg.JobStore,
 	}
 }
 
-// Process handles text or audio and returns the response.
-// Uses agent loop with tool calling: LLM may respond directly or call query_history/execute_commands.
-func (s *Service) Process(ctx context.Context, u *user.User, text string, audioBase64 string, audioFormat string) (*Response, error) {
-	userID := u.ID
+// Process handles text or audio. For text, returns the full response. For audio, returns immediately
+// with job_id and transcribed text; client polls GET /chat/jobs/{id} for the LLM result.
+func (s *Service) Process(ctx context.Context, u *user.User, text string, audioBase64 string, audioFormat string) (*Response, *JobResponse, error) {
 	if text == "" && audioBase64 != "" {
+		return s.processAudio(ctx, u, audioBase64, audioFormat)
+	}
+	resp, err := s.processText(ctx, u, text)
+	if err != nil {
+		return nil, nil, err
+	}
+	return resp, nil, nil
+}
+
+// JobResponse is returned when audio is submitted; client polls for completion.
+type JobResponse struct {
+	JobID  string     `json:"job_id"`
+	Text   string     `json:"text"`
+	Status JobStatus  `json:"status"`
+	Result *Response  `json:"result,omitempty"`
+	Error  string     `json:"error,omitempty"`
+}
+
+func (s *Service) processAudio(ctx context.Context, u *user.User, audioBase64 string, audioFormat string) (*Response, *JobResponse, error) {
+	userID := u.ID
+	if s.systemlog != nil {
+		s.systemlog.Log(ctx, systemlog.InsertParams{
+			Category: systemlog.CategoryAI,
+			UserID:   &userID,
+			Details:  map[string]interface{}{"op": "transcribe", "has_audio": true},
+		})
+	}
+	text, err := s.client.Transcribe(ctx, userID, audioBase64, audioFormat)
+	if err != nil {
 		if s.systemlog != nil {
 			s.systemlog.Log(ctx, systemlog.InsertParams{
 				Category: systemlog.CategoryAI,
 				UserID:   &userID,
-				Details:   map[string]interface{}{"op": "transcribe", "has_audio": true},
+				Details:  map[string]interface{}{"op": "transcribe", "error": err.Error()},
+				Error:    err.Error(),
 			})
 		}
-		var err error
-		text, err = s.client.Transcribe(ctx, userID, audioBase64, audioFormat)
-		if err != nil {
-			if s.systemlog != nil {
-				s.systemlog.Log(ctx, systemlog.InsertParams{
-					Category: systemlog.CategoryAI,
-					UserID:   &userID,
-					Details:   map[string]interface{}{"op": "transcribe", "error": err.Error()},
-					Error:     err.Error(),
-				})
-			}
-			return nil, fmt.Errorf("transcribe: %w", err)
-		}
+		return nil, nil, fmt.Errorf("transcribe: %w", err)
 	}
 	if strings.TrimSpace(text) == "" {
-		return &Response{Message: "Didn't catch that — try again?"}, nil
+		return &Response{Message: "Didn't catch that — try again?"}, nil, nil
 	}
+	if s.jobStore == nil {
+		resp, err := s.processText(ctx, u, text)
+		if err != nil {
+			return nil, nil, err
+		}
+		return resp, nil, nil
+	}
+	jobID := s.jobStore.Create(userID, text)
+	go func() {
+		bgCtx := context.Background()
+		resp, err := s.processText(bgCtx, u, text)
+		if err != nil {
+			s.jobStore.Fail(jobID, err.Error())
+			return
+		}
+		s.jobStore.Complete(jobID, resp)
+	}()
+	return nil, &JobResponse{JobID: jobID.String(), Text: text, Status: JobStatusProcessing}, nil
+}
+
+// GetJob returns a job by ID if it exists and belongs to the user.
+func (s *Service) GetJob(jobID uuid.UUID, userID uuid.UUID) (*Job, bool) {
+	if s.jobStore == nil {
+		return nil, false
+	}
+	return s.jobStore.Get(jobID, userID)
+}
+
+// processText runs the LLM pipeline for the given text. Used by Process (text) and async job (audio).
+func (s *Service) processText(ctx context.Context, u *user.User, text string) (*Response, error) {
+	userID := u.ID
 	if s.systemlog != nil {
 		trunc := text
 		if len(trunc) > 200 {

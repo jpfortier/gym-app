@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
+	"github.com/jpfortier/gym-app/internal/chat"
 	"github.com/jpfortier/gym-app/internal/chatmessages"
 	"github.com/jpfortier/gym-app/internal/env"
 	"github.com/jpfortier/gym-app/internal/exercise"
@@ -60,7 +61,7 @@ func TestChat_realLLM_manual(t *testing.T) {
 	mux := chatTestServerWithR2(t, db, u, chatMessagesRepo)
 	samplesDir := filepath.Join("..", "..", "samples", "audio")
 
-	postChat := func(audioPath string, text string) (int, map[string]interface{}) {
+	postChat := func(mux *http.ServeMux, audioPath string, text string) (int, map[string]interface{}) {
 		var body []byte
 		if audioPath != "" {
 			data, err := os.ReadFile(audioPath)
@@ -81,10 +82,13 @@ func TestChat_realLLM_manual(t *testing.T) {
 		_ = json.NewDecoder(rec.Body).Decode(&out)
 		return rec.Code, out
 	}
+	postChatDefault := func(audioPath string, text string) (int, map[string]interface{}) {
+		return postChat(mux, audioPath, text)
+	}
 
 	// Clear path: explicit prompts that should log without follow-up. Verifies the flow actually works.
 	t.Run("0_clear_path_log_and_correction", func(t *testing.T) {
-		code, out := postChat("", "bench press 135 for 8")
+		code, out := postChatDefault("", "bench press 135 for 8")
 		if code != http.StatusOK {
 			t.Fatalf("log: got status %d: %v", code, out)
 		}
@@ -94,7 +98,7 @@ func TestChat_realLLM_manual(t *testing.T) {
 		}
 		t.Logf("logged %d entries", len(entries))
 
-		code, out = postChat("", "change the last bench to 140")
+		code, out = postChatDefault("", "change the last bench to 140")
 		if code != http.StatusOK {
 			t.Fatalf("correction: got status %d: %v", code, out)
 		}
@@ -108,7 +112,7 @@ func TestChat_realLLM_manual(t *testing.T) {
 	// 0a. Text: two logs same exercise, second better — expect PR (first = baseline no celebration, second = celebrate).
 	// Executor unit test TestExecutor_AppendSet verifies PR detection; this exercises the full LLM path.
 	t.Run("0a_text_two_logs_same_exercise_pr", func(t *testing.T) {
-		code, out := postChat("", "deadlift 185 for 5")
+		code, out := postChatDefault("", "deadlift 185 for 5")
 		if code != http.StatusOK {
 			t.Fatalf("first log: got status %d: %v", code, out)
 		}
@@ -121,7 +125,7 @@ func TestChat_realLLM_manual(t *testing.T) {
 			t.Logf("first log: expected 0 PRs (baseline), got %d", len(prs1))
 		}
 
-		code, out = postChat("", "deadlift 200 for 5")
+		code, out = postChatDefault("", "deadlift 200 for 5")
 		if code != http.StatusOK {
 			t.Fatalf("second log: got status %d: %v", code, out)
 		}
@@ -186,7 +190,7 @@ func TestChat_realLLM_manual(t *testing.T) {
 	// 0b. Text: two rack pulls — second is PR, triggers gpt-image-1.5 Edit API with reference images.
 	// Requires GYM_PR_IMAGE_REF_1, GYM_PR_IMAGE_REF_2 and R2 configured for image_url to be set.
 	t.Run("0b_text_pr_image_generation", func(t *testing.T) {
-		code, out := postChat("", "rack pull 200 for 5")
+		code, out := postChatDefault("", "rack pull 200 for 5")
 		if code != http.StatusOK {
 			t.Fatalf("first log: got status %d: %v", code, out)
 		}
@@ -195,7 +199,7 @@ func TestChat_realLLM_manual(t *testing.T) {
 			t.Fatalf("first log: expected entries, got %d. message=%q", len(entries), out["message"])
 		}
 
-		code, out = postChat("", "rack pull 370 for 5")
+		code, out = postChatDefault("", "rack pull 370 for 5")
 		if code != http.StatusOK {
 			t.Fatalf("second log: got status %d: %v", code, out)
 		}
@@ -232,7 +236,7 @@ func TestChat_realLLM_manual(t *testing.T) {
 	// 1. Audio: Close Grip Bench Press, 130.
 	t.Run("1_audio_close_grip_bench", func(t *testing.T) {
 		path := filepath.Join(samplesDir, "20260306 133927.m4a")
-		code, out := postChat(path, "")
+		code, out := postChatDefault(path, "")
 		if code != http.StatusOK {
 			t.Fatalf("got status %d: %v", code, out)
 		}
@@ -243,10 +247,84 @@ func TestChat_realLLM_manual(t *testing.T) {
 		t.Logf("message=%q", msg)
 	})
 
+	// 1b. Async audio: POST returns job_id+text immediately, poll GET /chat/jobs/{id} for result.
+	t.Run("1b_async_audio_full_flow", func(t *testing.T) {
+		jobStore := chat.NewJobStore()
+		go jobStore.RunCleanup(context.Background())
+		asyncMux := chatTestServerWithR2AndJobStore(t, db, u, chatMessagesRepo, jobStore)
+
+		path := filepath.Join(samplesDir, "20260306 133927.m4a")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		b64 := base64.StdEncoding.EncodeToString(data)
+		body, _ := json.Marshal(map[string]string{"audio_base64": b64, "audio_format": "m4a"})
+		req := httptest.NewRequest(http.MethodPost, "/chat", bytes.NewReader(body))
+		req.Header.Set("Authorization", "Bearer x")
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		asyncMux.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("POST /chat: got status %d: %s", rec.Code, rec.Body.String())
+		}
+		var out map[string]interface{}
+		if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
+			t.Fatal(err)
+		}
+		jobID, _ := out["job_id"].(string)
+		text, _ := out["text"].(string)
+		status, _ := out["status"].(string)
+		if jobID == "" {
+			t.Fatalf("expected job_id, got %v", out)
+		}
+		if text == "" {
+			t.Fatalf("expected text (transcription), got %v", out)
+		}
+		if status != "processing" {
+			t.Fatalf("expected status=processing, got %q", status)
+		}
+		t.Logf("job_id=%s text=%q", jobID, text)
+
+		deadline := time.Now().Add(30 * time.Second)
+		var result map[string]interface{}
+		for time.Now().Before(deadline) {
+			getReq := httptest.NewRequest(http.MethodGet, "/chat/jobs/"+jobID, nil)
+			getReq.Header.Set("Authorization", "Bearer x")
+			getRec := httptest.NewRecorder()
+			asyncMux.ServeHTTP(getRec, getReq)
+			if getRec.Code != http.StatusOK {
+				t.Fatalf("GET /chat/jobs: got status %d", getRec.Code)
+			}
+			if err := json.NewDecoder(getRec.Body).Decode(&out); err != nil {
+				t.Fatal(err)
+			}
+			status, _ = out["status"].(string)
+			if status == "complete" {
+				result, _ = out["result"].(map[string]interface{})
+				break
+			}
+			if status == "failed" {
+				errMsg, _ := out["error"].(string)
+				t.Fatalf("job failed: %s", errMsg)
+			}
+			time.Sleep(300 * time.Millisecond)
+		}
+		if result == nil {
+			t.Fatalf("job did not complete within 30s")
+		}
+		msg, _ := result["message"].(string)
+		if msg == "" {
+			t.Errorf("expected message in result, got %v", result["message"])
+		}
+		t.Logf("async result message=%q", msg)
+	})
+
 	// 2. Audio: What's my last close grip bench press?
 	t.Run("2_audio_query_close_grip", func(t *testing.T) {
 		path := filepath.Join(samplesDir, "20260306 133935.m4a")
-		code, out := postChat(path, "")
+		code, out := postChatDefault(path, "")
 		if code != http.StatusOK {
 			t.Fatalf("got status %d: %v", code, out)
 		}
@@ -260,7 +338,7 @@ func TestChat_realLLM_manual(t *testing.T) {
 	// 3. Audio: RDL 300×8 + shoulder press 100×8 (PRs for new user)
 	t.Run("3_audio_rdl_shoulder_pr", func(t *testing.T) {
 		path := filepath.Join(samplesDir, "20260306 133944.m4a")
-		code, out := postChat(path, "")
+		code, out := postChatDefault(path, "")
 		if code != http.StatusOK {
 			t.Fatalf("got status %d: %v", code, out)
 		}
@@ -275,7 +353,7 @@ func TestChat_realLLM_manual(t *testing.T) {
 	// 4. Audio: What's my last deadlift?
 	t.Run("4_audio_query_deadlift", func(t *testing.T) {
 		path := filepath.Join(samplesDir, "20260306 134002.m4a")
-		code, out := postChat(path, "")
+		code, out := postChatDefault(path, "")
 		if code != http.StatusOK {
 			t.Fatalf("got status %d: %v", code, out)
 		}
@@ -288,7 +366,7 @@ func TestChat_realLLM_manual(t *testing.T) {
 
 	// 5. Text: squat 225 for 1 (1RM PR) — may get LLM follow-up asking for squat type
 	t.Run("5_text_squat_1rm", func(t *testing.T) {
-		code, out := postChat("", "squat 225 for 1")
+		code, out := postChatDefault("", "squat 225 for 1")
 		if code != http.StatusOK {
 			t.Fatalf("got status %d: %v", code, out)
 		}
@@ -320,7 +398,7 @@ func TestChat_realLLM_manual(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		code, out := postChat("", "change the last squat to 230")
+		code, out := postChatDefault("", "change the last squat to 230")
 		if code != http.StatusOK {
 			t.Fatalf("got status %d: %v", code, out)
 		}
@@ -347,7 +425,7 @@ func TestChat_realLLM_manual(t *testing.T) {
 
 	// 7. Text: forget that squat
 	t.Run("7_text_remove", func(t *testing.T) {
-		code, out := postChat("", "forget that squat")
+		code, out := postChatDefault("", "forget that squat")
 		if code != http.StatusOK {
 			t.Fatalf("got status %d: %v", code, out)
 		}
@@ -360,7 +438,7 @@ func TestChat_realLLM_manual(t *testing.T) {
 
 	// 8. Text: bring that squat back
 	t.Run("8_text_restore", func(t *testing.T) {
-		code, out := postChat("", "bring that squat back")
+		code, out := postChatDefault("", "bring that squat back")
 		if code != http.StatusOK {
 			t.Fatalf("got status %d: %v", code, out)
 		}
@@ -374,7 +452,7 @@ func TestChat_realLLM_manual(t *testing.T) {
 	// 9. Audio: My name's Rocky
 	t.Run("9_audio_set_name", func(t *testing.T) {
 		path := filepath.Join(samplesDir, "20260309 142616.m4a")
-		code, out := postChat(path, "")
+		code, out := postChatDefault(path, "")
 		if code != http.StatusOK {
 			t.Fatalf("got status %d: %v", code, out)
 		}
@@ -391,7 +469,7 @@ func TestChat_realLLM_manual(t *testing.T) {
 
 	// 10. Text: create note
 	t.Run("10_text_create_note", func(t *testing.T) {
-		code, out := postChat("", "note for bench press: narrow grip feels good")
+		code, out := postChatDefault("", "note for bench press: narrow grip feels good")
 		if code != http.StatusOK {
 			t.Fatalf("got status %d: %v", code, out)
 		}

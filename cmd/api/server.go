@@ -97,6 +97,8 @@ func NewServer(ctx context.Context) (*Server, error) {
 	)
 	syslogRepo := systemlog.NewRepo(database)
 	syslog := systemlog.NewRepoLogger(syslogRepo)
+	chatJobStore := chat.NewJobStore()
+	go chatJobStore.RunCleanup(context.Background())
 	chatSvc := chat.NewService(chat.Config{
 		Client:           aiClient,
 		SessionRepo:      sessionRepo,
@@ -108,6 +110,7 @@ func NewServer(ctx context.Context) (*Server, error) {
 		R2:               r2,
 		CommandExecutor:  cmdExecutor,
 		Systemlog:        syslog,
+		JobStore:         chatJobStore,
 	})
 
 	googleClientID := env.GoogleClientID()
@@ -127,6 +130,7 @@ func NewServer(ctx context.Context) (*Server, error) {
 	mux.Handle("GET /me", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.Me))))
 	mux.Handle("GET /chat/messages", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.ChatMessages(chatMessagesRepo)))))
 	mux.Handle("POST /chat", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.Chat(chatSvc)))))
+	mux.Handle("GET /chat/jobs/{id}", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.ChatJob(chatSvc)))))
 	mux.Handle("GET /sessions", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.SessionsList(sessionRepo)))))
 	mux.Handle("GET /sessions/{id}", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.SessionDetail(sessionRepo, logentryRepo, exerciseRepo)))))
 	mux.Handle("GET /exercises", auth.RequireAuth(verifier, userStore, googleClientID, syslog)(logAction(http.HandlerFunc(handler.ExercisesList(exerciseRepo)))))

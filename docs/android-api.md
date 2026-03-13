@@ -96,7 +96,20 @@ Or with audio:
 - `text` and `audio_base64` are mutually exclusive; send one
 - `audio_format` optional: `"m4a"`, `"webm"`, etc. Defaults to webm if omitted
 
-**Response:** Unified shape. All responses include `message` (when applicable). Optional fields: `entries`, `history`, `prs`.
+**Response (text input):** Unified shape. All responses include `message` (when applicable). Optional fields: `entries`, `history`, `prs`.
+
+**Response (audio input):** Returns immediately with transcribed text and a job ID. Poll `GET /chat/jobs/{job_id}` for the LLM result.
+```json
+{
+  "job_id": "uuid",
+  "text": "bench press 135 for 8",
+  "status": "processing"
+}
+```
+- Show `text` in the UI right away (what the user said)
+- Poll `GET /chat/jobs/{job_id}` until `status` is `"complete"` or `"failed"`
+- When `complete`, response includes `result` with the same shape as text response
+- When `failed`, response includes `error`
 
 ```json
 {
@@ -131,6 +144,28 @@ Or with audio:
 - **`entries`** — Present when exercises were logged.
 - **`history`** — Present when the user asked about past workouts.
 - **`prs`** — Present when new PR(s) were detected.
+
+### GET /chat/jobs/{id}
+
+Poll for async chat job completion (audio input). Auth required.
+
+**Response:** `200 OK` with job state.
+```json
+{
+  "job_id": "uuid",
+  "text": "bench press 135 for 8",
+  "status": "complete",
+  "result": {
+    "message": "Logged bench press **135×8** for today.",
+    "entries": [...],
+    "history": null,
+    "prs": []
+  }
+}
+```
+- `status`: `"processing"` | `"complete"` | `"failed"`
+- `result`: Present when `status` is `"complete"`
+- `error`: Present when `status` is `"failed"`
 
 **Example phrases:**
 - Log: "bench 135 for 8", "squats 185x5", "RDL 135 for 6"

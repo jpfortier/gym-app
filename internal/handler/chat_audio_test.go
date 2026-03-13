@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
@@ -31,7 +32,7 @@ func TestChat_audioSamples(t *testing.T) {
 
 	u := testutil.CreateTestUser(t, db, ctx, "audio")
 
-	chatSvc := chatTestService(t, db, nil)
+		chatSvc := chatTestService(t, db, nil)
 
 	// Resolve samples path: go test runs from package dir (internal/handler), so go up to module root
 	samplesDir := filepath.Join("..", "..", "samples", "audio")
@@ -56,9 +57,15 @@ func TestChat_audioSamples(t *testing.T) {
 			}
 			b64 := base64.StdEncoding.EncodeToString(data)
 
-			resp, err := chatSvc.Process(ctx, u, "", b64, "m4a")
+			resp, jobResp, err := chatSvc.Process(ctx, u, "", b64, "m4a")
 			if err != nil {
 				t.Fatalf("Process: %v", err)
+			}
+			if jobResp != nil {
+				resp = pollJobUntilComplete(t, chatSvc, jobResp.JobID, u.ID, 30*time.Second)
+			}
+			if resp == nil {
+				t.Fatal("Process returned nil response")
 			}
 
 			t.Logf("file=%s message=%s", name, resp.Message)

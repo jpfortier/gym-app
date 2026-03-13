@@ -61,6 +61,7 @@ func chatTestService(t *testing.T, db *sql.DB, chatMessagesRepo *chatmessages.Re
 		R2:               nil,
 		CommandExecutor:  cmdExecutor,
 		Systemlog:        nil,
+		JobStore:         nil,
 	})
 }
 
@@ -72,11 +73,18 @@ func chatTestServer(t *testing.T, db *sql.DB, u *user.User, chatMessagesRepo *ch
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
 	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud", nil)(http.HandlerFunc(Chat(chatSvc))))
+	mux.Handle("GET /chat/jobs/{id}", auth.RequireAuth(verifier, userRepo, "aud", nil)(http.HandlerFunc(ChatJob(chatSvc))))
 	return mux
 }
 
 // chatTestServiceWithR2 builds the chat service with real AI and R2 (when configured). For integration tests.
 func chatTestServiceWithR2(t *testing.T, db *sql.DB, chatMessagesRepo *chatmessages.Repo) *chat.Service {
+	t.Helper()
+	return chatTestServiceWithR2AndJobStore(t, db, chatMessagesRepo, nil)
+}
+
+// chatTestServiceWithR2AndJobStore builds the chat service with optional JobStore. JobStore enables async audio.
+func chatTestServiceWithR2AndJobStore(t *testing.T, db *sql.DB, chatMessagesRepo *chatmessages.Repo, jobStore *chat.JobStore) *chat.Service {
 	t.Helper()
 	throttle := ai.NewThrottlerFromEnv()
 	aiClient := ai.NewClient(throttle, nil)
@@ -106,18 +114,64 @@ func chatTestServiceWithR2(t *testing.T, db *sql.DB, chatMessagesRepo *chatmessa
 		R2:               r2,
 		CommandExecutor:  cmdExecutor,
 		Systemlog:        nil,
+		JobStore:         jobStore,
 	})
+}
+
+// pollJobUntilComplete polls GET /chat/jobs/{id} until status is complete or failed. Returns the result or nil.
+func pollJobUntilComplete(t *testing.T, chatSvc *chat.Service, jobID string, userID uuid.UUID, timeout time.Duration) *chat.Response {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		job, ok := chatSvc.GetJob(uuid.MustParse(jobID), userID)
+		if !ok {
+			t.Fatalf("job %s not found", jobID)
+		}
+		switch job.Status {
+		case chat.JobStatusComplete:
+			return job.Result
+		case chat.JobStatusFailed:
+			t.Fatalf("job failed: %s", job.Error)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	t.Fatalf("job %s did not complete within %v", jobID, timeout)
+	return nil
 }
 
 // chatTestServerWithR2 sets up POST /chat with real AI and R2. For integration tests.
 func chatTestServerWithR2(t *testing.T, db *sql.DB, u *user.User, chatMessagesRepo *chatmessages.Repo) *http.ServeMux {
 	t.Helper()
-	chatSvc := chatTestServiceWithR2(t, db, chatMessagesRepo)
+	return chatTestServerWithR2AndJobStore(t, db, u, chatMessagesRepo, nil)
+}
+
+// chatTestServerWithR2AndJobStore sets up POST /chat and GET /chat/jobs/{id}. jobStore enables async audio.
+func chatTestServerWithR2AndJobStore(t *testing.T, db *sql.DB, u *user.User, chatMessagesRepo *chatmessages.Repo, jobStore *chat.JobStore) *http.ServeMux {
+	t.Helper()
+	chatSvc := chatTestServiceWithR2AndJobStore(t, db, chatMessagesRepo, jobStore)
 	userRepo := user.NewRepo(db)
 	verifier := &mockVerifier{payload: &idtoken.Payload{Subject: u.GoogleID}}
 	mux := http.NewServeMux()
 	mux.Handle("POST /chat", auth.RequireAuth(verifier, userRepo, "aud", nil)(http.HandlerFunc(Chat(chatSvc))))
+	mux.Handle("GET /chat/jobs/{id}", auth.RequireAuth(verifier, userRepo, "aud", nil)(http.HandlerFunc(ChatJob(chatSvc))))
 	return mux
+}
+
+func TestChatJob_notFound_returns404(t *testing.T) {
+	db := dbForTest(t)
+	defer db.Close()
+	ctx := context.Background()
+	u := testutil.CreateTestUser(t, db, ctx, "chat-job")
+	mux := chatTestServer(t, db, u, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/chat/jobs/"+uuid.New().String(), nil)
+	req.Header.Set("Authorization", "Bearer x")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("got status %d, want 404", rec.Code)
+	}
 }
 
 func TestChat_logIntent(t *testing.T) {
