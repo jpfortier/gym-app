@@ -121,4 +121,6 @@ Admin panel: RequireAdmin middleware, cookie-based user picker, dashboard, users
 
 ## Lessons
 
+- **Gzip + ETag:** Gzip middleware compresses responses when client sends Accept-Encoding: gzip. ETag middleware on cacheable GET endpoints (sessions, exercises, query, prs) computes SHA256-based ETag and returns 304 when If-None-Match matches. Cache-Control: private, max-age=0, must-revalidate for user-specific data.
+
 - **Fly Postgres password reset (postgres-flex):** When `fly postgres connect` fails with "password authentication failed", the postgres user password is out of sync with OPERATOR_PASSWORD/SU_PASSWORD. To reset: SSH in and use unix socket (peer auth). The socket is at `/var/run/postgresql/.s.PGSQL.5433` (port 5433, not 5432). Run: `fly ssh console -a gym-app-pg -C "su postgres -c \"psql -h /var/run/postgresql -p 5433 -d postgres -c \\\"ALTER USER postgres PASSWORD 'gym-dev-2025';\\\"\""` Then update .env to use that password. The docs' suggested `gym-dev-2025` only works after you've run this reset.
